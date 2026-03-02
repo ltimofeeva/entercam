@@ -1,11 +1,42 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Card from "../components/Card.jsx";
 import Input from "../components/Input.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import { uid } from "../lib/utils.js";
+import { api } from "../lib/api.js";
+import { getTgContext } from "../lib/tg.js";
 
 export default function Employees({ state, setState, goEmployee }) {
   const [q, setQ] = useState("");
+    useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const ctx = getTgContext();
+
+        // Если Mini App открыли вне Telegram (например, в браузере)
+        // — отправим хотя бы marker
+        const payload = {
+          event: "employee_screen_open",
+          ts: new Date().toISOString(),
+          ...(ctx ?? { tg: false })
+        };
+
+        const r = await api.notifyEmployeeScreenOpened(payload);
+        if (!cancelled) {
+          // можно логировать в консоль для отладки
+          // console.log("n8n webhook ok", r);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          // console.warn("n8n webhook error", e);
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", email: "", dept: "" });
 
