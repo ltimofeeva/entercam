@@ -127,6 +127,30 @@ a { color: inherit; text-decoration: none; }
 .modalTitle { font-weight: 900; margin-bottom: 10px; }
 .modalActions { display: flex; gap: 10px; margin-top: 12px; }
 .modalActions .btn { flex: 1; }
+.header-sub {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.header-user {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.header-dept {
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.header-single {
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+}
 
 .list { display: flex; flex-direction: column; gap: 10px; }
 .sep { height: 1px; background: var(--line); margin: 10px 0; }
