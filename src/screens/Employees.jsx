@@ -35,6 +35,8 @@ export default function Employees({ state, setState, goEmployee }) {
             setLoading(false);
           }
           return;
+
+          
         }
 
         const payload = {
@@ -72,6 +74,8 @@ export default function Employees({ state, setState, goEmployee }) {
         setState((s) => ({
           ...s,
           employees: employeesFromApi,
+          currentUser: data.user 
+}));
         }));
 
         setLoading(false);
