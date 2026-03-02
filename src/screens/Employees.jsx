@@ -9,19 +9,15 @@ import { getTgContext } from "../lib/tg.js";
 export default function Employees({ state, setState, goEmployee }) {
   const [q, setQ] = useState("");
     useEffect(() => {
-    let cancelled = false;
+  const userId = getTgUserId();
 
-    (async () => {
-      try {
-        const ctx = getTgContext();
-
-        // Если Mini App открыли вне Telegram (например, в браузере)
-        // — отправим хотя бы marker
-        const payload = {
-          event: "employee_screen_open",
-          ts: new Date().toISOString(),
-          ...(ctx ?? { tg: false })
-        };
+  // если открыли не из Telegram — userId будет null
+  postEmployeeOpened({
+    event: "employee_screen_open",
+    user_id: userId,
+    ts: new Date().toISOString()
+  }).catch(() => {});
+}, []);
 
         const r = await api.notifyEmployeeScreenOpened(payload);
         if (!cancelled) {
