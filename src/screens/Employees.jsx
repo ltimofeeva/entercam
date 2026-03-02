@@ -12,25 +12,82 @@ export default function Employees({ state, setState, goEmployee }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", email: "", dept: "" });
 
-  // При открытии экрана отправляем webhook в n8n с user_id
+  // NEW: статусы загрузки/авторизации
+  const [loading, setLoading] = useState(true);
+  const [authorized, setAuthorized] = useState(null); // null | true | false
+  const [departmentName, setDepartmentName] = useState("");
+
+  // При открытии экрана: проверяем регистрацию и получаем сотрудников отдела
   useEffect(() => {
+    let cancelled = false;
+
     (async () => {
       try {
-        const ctx = getTgContext(); // { user_id, initData, ... } или null
+        setLoading(true);
+
+        const ctx = getTgContext();
+        const userId = ctx?.user_id ?? null;
+
+        // Если открыли не из Telegram WebApp — userId будет null
+        if (!userId) {
+          if (!cancelled) {
+            setAuthorized(false);
+            setLoading(false);
+          }
+          return;
+        }
+
         const payload = {
-          event: "employee_screen_open",
-          user_id: ctx?.user_id ?? null,
-          ts: new Date().toISOString()
-          // Если нужно на n8n валидировать подпись — добавь:
+          event: "employee_open",
+          user_id: userId,
+          ts: new Date().toISOString(),
+          // Если нужно валидировать подпись на n8n:
           // initData: ctx?.initData ?? ""
         };
 
-        await api.notifyEmployeeScreenOpened(payload);
-      } catch {
-        // не мешаем UI, даже если webhook недоступен
+        const data = await api.employeeCheck(payload);
+
+        const ok = Boolean(data?.authorized ?? data?.ok ?? data?.result);
+        if (cancelled) return;
+
+        if (!ok) {
+          setAuthorized(false);
+          setLoading(false);
+          return;
+        }
+
+        setAuthorized(true);
+
+        const depName =
+          data?.department?.name ??
+          data?.department_name ??
+          data?.dept_name ??
+          "";
+
+        setDepartmentName(depName);
+
+        const employeesFromApi = Array.isArray(data?.employees) ? data.employees : [];
+
+        // Записываем в общий state, чтобы детали/машины работали без переписывания
+        setState((s) => ({
+          ...s,
+          employees: employeesFromApi,
+        }));
+
+        setLoading(false);
+      } catch (e) {
+        // Если webhook упал/ошибка — считаем, что не авторизован (или можно показать “ошибка сервера”)
+        if (!cancelled) {
+          setAuthorized(false);
+          setLoading(false);
+        }
       }
     })();
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [setState]);
 
   const list = useMemo(() => {
     const qq = q.trim().toLowerCase();
@@ -43,6 +100,7 @@ export default function Employees({ state, setState, goEmployee }) {
   }, [q, state.employees]);
 
   const addEmployee = () => {
+    // Добавление локально (позже можно отправить на n8n)
     if (!form.name.trim()) return;
 
     const next = {
@@ -50,8 +108,8 @@ export default function Employees({ state, setState, goEmployee }) {
       name: form.name.trim(),
       phone: form.phone.trim(),
       email: form.email.trim(),
-      dept: form.dept.trim(),
-      cars: []
+      dept: form.dept.trim() || departmentName || "",
+      cars: [],
     };
 
     setState((s) => ({ ...s, employees: [next, ...s.employees] }));
@@ -59,8 +117,34 @@ export default function Employees({ state, setState, goEmployee }) {
     setOpen(false);
   };
 
+  // 1) Лоадер
+  if (loading) {
+    return (
+      <div className="content">
+        <EmptyState title="Загрузка…" hint="Проверяем доступ и получаем сотрудников." />
+      </div>
+    );
+  }
+
+  // 2) Не авторизован
+  if (authorized === false) {
+    return (
+      <div className="content">
+        <EmptyState
+          title="Пройдите регистрацию через бота"
+          hint="После регистрации откройте мини-приложение ещё раз."
+        />
+      </div>
+    );
+  }
+
+  // 3) Авторизован → показываем сотрудников
   return (
     <div className="content">
+      {departmentName ? (
+        <div className="pill">Отдел: {departmentName}</div>
+      ) : null}
+
       <Input
         placeholder="Поиск по имени / телефону"
         value={q}
@@ -70,7 +154,7 @@ export default function Employees({ state, setState, goEmployee }) {
       {state.employees.length === 0 ? (
         <EmptyState
           title="Сотрудников пока нет"
-          hint="Добавьте первого сотрудника."
+          hint="В этом отделе пока нет сотрудников."
           action={
             <button className="btn primary" onClick={() => setOpen(true)}>
               + Добавить
@@ -125,6 +209,7 @@ export default function Employees({ state, setState, goEmployee }) {
                 label="Отдел"
                 value={form.dept}
                 onChange={(e) => setForm({ ...form, dept: e.target.value })}
+                placeholder={departmentName ? `По умолчанию: ${departmentName}` : ""}
               />
             </div>
 
