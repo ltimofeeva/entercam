@@ -143,7 +143,6 @@ export default function Employees({ state, setState, goEmployee }) {
   // 3) Авторизован → показываем сотрудников
   return (
     <div className="content">
-      {departmentName ? <div className="pill">{departmentName}</div> : null}
 
       <Input
         placeholder="Поиск по имени / телефону"
