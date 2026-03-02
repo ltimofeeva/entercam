@@ -10,7 +10,20 @@ export default function Header({ title, subtitle, left, right }) {
         </div>
         {right}
       </div>
-      {subtitle ? <div className="hsub">{subtitle}</div> : null}
+
+      {subtitle && (
+        <div className="header-sub">
+          {subtitle.fio && (
+            <div className="header-user">{subtitle.fio}</div>
+          )}
+          {subtitle.department && (
+            <div className="header-dept">{subtitle.department}</div>
+          )}
+          {subtitle.single && (
+            <div className="header-single">{subtitle.single}</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
