@@ -68,8 +68,8 @@ export default function App() {
     ? <button className="btn ghost" onClick={onBack}>←</button>
     : null;
 
-  const right = <button className="btn" onClick={() => showAlert("Меню: позже добавим настройки/выход")}>⋯</button>;
-
+  const right = null;
+  
   return (
     <div className="app">
       <Header title={title} subtitle={subtitle} left={left} right={right} />
