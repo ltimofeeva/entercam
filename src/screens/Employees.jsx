@@ -12,7 +12,7 @@ export default function Employees({ state, setState, goEmployee }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", email: "", dept: "" });
 
-  // NEW: статусы загрузки/авторизации
+  // статусы загрузки/авторизации
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(null); // null | true | false
   const [departmentName, setDepartmentName] = useState("");
@@ -35,19 +35,19 @@ export default function Employees({ state, setState, goEmployee }) {
             setLoading(false);
           }
           return;
-
-          
         }
 
         const payload = {
           event: "employee_open",
           user_id: userId,
           ts: new Date().toISOString(),
-          // Если нужно валидировать подпись на n8n:
-          // initData: ctx?.initData ?? ""
+          // initData: ctx?.initData ?? "" // если нужно валидировать подпись
         };
 
-        const data = await api.employeeCheck(payload);
+        const raw = await api.employeeCheck(payload);
+
+        // n8n может вернуть объект или массив с 1 элементом — нормализуем
+        const data = Array.isArray(raw) ? raw[0] : raw;
 
         const ok = Boolean(data?.authorized ?? data?.ok ?? data?.result);
         if (cancelled) return;
@@ -61,6 +61,7 @@ export default function Employees({ state, setState, goEmployee }) {
         setAuthorized(true);
 
         const depName =
+          data?.user?.department ??
           data?.department?.name ??
           data?.department_name ??
           data?.dept_name ??
@@ -74,13 +75,11 @@ export default function Employees({ state, setState, goEmployee }) {
         setState((s) => ({
           ...s,
           employees: employeesFromApi,
-          currentUser: data.user 
-}));
+          currentUser: data?.user ?? null,
         }));
 
         setLoading(false);
       } catch (e) {
-        // Если webhook упал/ошибка — считаем, что не авторизован (или можно показать “ошибка сервера”)
         if (!cancelled) {
           setAuthorized(false);
           setLoading(false);
@@ -104,7 +103,6 @@ export default function Employees({ state, setState, goEmployee }) {
   }, [q, state.employees]);
 
   const addEmployee = () => {
-    // Добавление локально (позже можно отправить на n8n)
     if (!form.name.trim()) return;
 
     const next = {
@@ -116,7 +114,7 @@ export default function Employees({ state, setState, goEmployee }) {
       cars: [],
     };
 
-    setState((s) => ({ ...s, employees: [next, ...s.employees] }));
+    setState((s) => ({ ...s, employees: [next, ...(s.employees ?? [])] }));
     setForm({ name: "", phone: "", email: "", dept: "" });
     setOpen(false);
   };
@@ -145,9 +143,7 @@ export default function Employees({ state, setState, goEmployee }) {
   // 3) Авторизован → показываем сотрудников
   return (
     <div className="content">
-      {departmentName ? (
-        <div className="pill">Отдел: {departmentName}</div>
-      ) : null}
+      {departmentName ? <div className="pill">{departmentName}</div> : null}
 
       <Input
         placeholder="Поиск по имени / телефону"
