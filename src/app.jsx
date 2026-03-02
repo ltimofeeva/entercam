@@ -27,12 +27,20 @@ export default function App() {
   }, [tab, view.name]);
 
   const subtitle = useMemo(() => {
-    if (view.name === "employee") {
-      const e = state.employees.find((x) => x.id === view.employeeId);
-      return e?.phone ? e.phone : "";
-    }
-    return "";
-  }, [state.employees, view]);
+  if (tab === "employees" && state.currentUser) {
+    return {
+      fio: state.currentUser.fio,
+      department: state.currentUser.department
+    };
+  }
+
+  if (view.name === "employee") {
+    const e = state.employees.find((x) => x.id === view.employeeId);
+    return e?.phone ? { single: e.phone } : null;
+  }
+
+  return null;
+}, [tab, view, state]);
 
   const goEmployee = (id) => {
     setView({ name: "employee", employeeId: id });
