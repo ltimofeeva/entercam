@@ -1,19 +1,133 @@
 // src/screens/Employees.jsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Card from "../components/Card.jsx";
 import Input from "../components/Input.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import { uid } from "../lib/utils.js";
+import { api } from "../lib/api.js";
+import { getTgContext } from "../lib/tg.js";
+
+function normalizeApiResponse(raw) {
+  const data = Array.isArray(raw) ? raw[0] : raw;
+  const ok = Boolean(data?.authorized ?? data?.ok ?? data?.result);
+
+  const user = data?.user ?? null;
+
+  // поддержка разных ключей для массива сотрудников
+  const employeesRaw =
+    (Array.isArray(data?.employees) && data.employees) ||
+    (Array.isArray(data?.["Сотрудники"]) && data["Сотрудники"]) ||
+    [];
+
+  // приводим к формату, который уже ждёт UI (name/phone/email/dept/cars)
+  const employees = employeesRaw.map((e) => ({
+    id: e.id ?? uid(),
+    name: e.name ?? e.fio ?? e.FIO ?? "",
+    phone: e.phone ? (String(e.phone).startsWith("+") ? e.phone : `+${e.phone}`) : "",
+    email: e.email ?? "",
+    dept: user?.department ?? "",
+    cars: Array.isArray(e.cars) ? e.cars : []
+  }));
+
+  return { ok, user, employees };
+}
 
 export default function Employees({ state, setState, goEmployee }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", email: "", dept: "" });
 
+  // статусы загрузки/авторизации
+  const [loading, setLoading] = useState(true);
+  const [authorized, setAuthorized] = useState(null); // null | true | false
+  const [departmentName, setDepartmentName] = useState("");
+
+  // При открытии экрана: проверяем регистрацию и получаем сотрудников отдела
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setLoading(true);
+
+        const ctx = getTgContext();
+        const userId = ctx?.user_id ?? null;
+
+        // Если открыли не из Telegram WebApp — userId будет null
+        if (!userId) {
+          if (!cancelled) {
+            setAuthorized(false);
+            setLoading(false);
+          }
+          return;
+        }
+
+        const payload = {
+          event: "employee_open",
+          user_id: userId,
+          ts: new Date().toISOString(),
+          // initData: ctx?.initData ?? "" // если нужно валидировать подпись
+        };
+
+        const raw = await api.employeeCheck(payload);
+        const { ok, user, employees } = normalizeApiResponse(raw);
+
+        // n8n может вернуть объект или массив с 1 элементом — нормализуем
+        const data = Array.isArray(raw) ? raw[0] : raw;
+
+        const ok = Boolean(data?.authorized ?? data?.ok ?? data?.result);
+        if (cancelled) return;
+
+        if (!ok) {
+          setAuthorized(false);
+          setLoading(false);
+          return;
+        }
+
+        setAuthorized(true);
+
+        const depName =
+          data?.user?.department ??
+          data?.department?.name ??
+          data?.department_name ??
+          data?.dept_name ??
+          "";
+
+        setDepartmentName(depName);
+
+        const employeesFromApi = Array.isArray(data?.employees) ? data.employees : [];
+
+        // Записываем в общий state, чтобы детали/машины работали без переписывания
+        // сохраняем пользователя и сотрудников в общий state
+        setState((s) => ({
+          ...s,
+          employees: employeesFromApi,
+          currentUser: data?.user ?? null,
+          currentUser: user,
+          employees
+        }));
+
+        setLoading(false);
+      } catch (e) {
+      } catch {
+        if (!cancelled) {
+          setAuthorized(false);
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [setState]);
+
   const list = useMemo(() => {
     const qq = q.trim().toLowerCase();
+    if (!qq) return state.employees;
     if (!qq) return state.employees || [];
 
+    return state.employees.filter((e) => {
     return (state.employees || []).filter((e) => {
       const hay = `${e.name} ${e.phone} ${e.email} ${e.dept}`.toLowerCase();
       return hay.includes(qq);
@@ -28,27 +142,54 @@ export default function Employees({ state, setState, goEmployee }) {
       name: form.name.trim(),
       phone: form.phone.trim(),
       email: form.email.trim(),
-      dept: form.dept.trim(),
+      dept: form.dept.trim() || departmentName || "",
+      cars: [],
+      dept: form.dept.trim() || state.currentUser?.department || "",
       cars: []
     };
 
+    setState((s) => ({ ...s, employees: [next, ...(s.employees ?? [])] }));
     setState((s) => ({ ...s, employees: [next, ...(s.employees || [])] }));
     setForm({ name: "", phone: "", email: "", dept: "" });
     setOpen(false);
   };
 
+  // 1) Лоадер
+  if (loading) {
+    return (
+      <div className="content">
+        <EmptyState title="Загрузка…" hint="Проверяем доступ и получаем сотрудников." />
+      </div>
+    );
+  }
+
+  // 2) Не авторизован
+  if (authorized === false) {
+    return (
+      <div className="content">
+        <EmptyState
+          title="Пройдите регистрацию через бота"
+          hint="После регистрации откройте мини-приложение ещё раз."
+        />
+      </div>
+    );
+  }
+
+  // 3) Авторизован → показываем сотрудников
   return (
     <div className="content">
+
       <Input
         placeholder="Поиск по имени / телефону"
         value={q}
         onChange={(e) => setQ(e.target.value)}
       />
 
+      {state.employees.length === 0 ? (
       {(state.employees || []).length === 0 ? (
         <EmptyState
           title="Сотрудников пока нет"
-          hint="Добавьте первого сотрудника"
+          hint="В этом отделе пока нет сотрудников."
           action={
             <button className="btn primary" onClick={() => setOpen(true)}>
               + Добавить
@@ -62,8 +203,10 @@ export default function Employees({ state, setState, goEmployee }) {
           <Card key={e.id} onClick={() => goEmployee(e.id)}>
             <div className="row">
               <div className="col">
+                <div className="big">{e.name}</div>
                 <div className="big">{e.name || "Без имени"}</div>
                 {e.phone ? <div className="muted">{e.phone}</div> : null}
+                <div className="muted">Машин: {e.cars?.length ?? 0}</div>
                 {e.email ? <div className="muted">{e.email}</div> : null}
               </div>
               <div className="muted" style={{ fontWeight: 900 }}>
@@ -103,6 +246,10 @@ export default function Employees({ state, setState, goEmployee }) {
                 label="Отдел"
                 value={form.dept}
                 onChange={(e) => setForm({ ...form, dept: e.target.value })}
+                placeholder={departmentName ? `По умолчанию: ${departmentName}` : ""}
+                placeholder={
+                  state.currentUser?.department ? `По умолчанию: ${state.currentUser.department}` : ""
+                }
               />
             </div>
 
@@ -110,6 +257,11 @@ export default function Employees({ state, setState, goEmployee }) {
               <button className="btn" onClick={() => setOpen(false)}>
                 Отмена
               </button>
+              <button
+                className="btn primary"
+                onClick={addEmployee}
+                disabled={!form.name.trim()}
+              >
               <button className="btn primary" onClick={addEmployee} disabled={!form.name.trim()}>
                 Сохранить
               </button>
