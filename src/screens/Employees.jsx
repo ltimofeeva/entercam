@@ -1,102 +1,14 @@
 // src/screens/Employees.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import Card from "../components/Card.jsx";
 import Input from "../components/Input.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import { uid } from "../lib/utils.js";
-import { api } from "../lib/api.js";
-import { getTgContext } from "../lib/tg.js";
-
-function normalizeApiResponse(raw) {
-  const data = Array.isArray(raw) ? raw[0] : raw;
-  const ok = Boolean(data?.authorized ?? data?.ok ?? data?.result);
-
-  const user = data?.user ?? null;
-
-  // поддержка разных ключей для массива сотрудников
-  const employeesRaw =
-    (Array.isArray(data?.employees) && data.employees) ||
-    (Array.isArray(data?.["Сотрудники"]) && data["Сотрудники"]) ||
-    [];
-
-  // приводим к формату, который уже ждёт UI (name/phone/email/dept/cars)
-  const employees = employeesRaw.map((e) => ({
-    id: e.id ?? uid(),
-    name: e.name ?? e.fio ?? e.FIO ?? "",
-    phone: e.phone ? (String(e.phone).startsWith("+") ? e.phone : `+${e.phone}`) : "",
-    email: e.email ?? "",
-    dept: user?.department ?? "",
-    cars: Array.isArray(e.cars) ? e.cars : []
-  }));
-
-  return { ok, user, employees };
-}
 
 export default function Employees({ state, setState, goEmployee }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", email: "", dept: "" });
-
-  const [loading, setLoading] = useState(true);
-  const [authorized, setAuthorized] = useState(null); // null | true | false
-
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        setLoading(true);
-
-        const ctx = getTgContext();
-        const userId = ctx?.user_id ?? null;
-
-        if (!userId) {
-          if (!cancelled) {
-            setAuthorized(false);
-            setLoading(false);
-          }
-          return;
-        }
-
-        const payload = {
-          event: "employee_open",
-          user_id: userId,
-          ts: new Date().toISOString(),
-        };
-
-        const raw = await api.employeeCheck(payload);
-        const { ok, user, employees } = normalizeApiResponse(raw);
-
-        if (cancelled) return;
-
-        if (!ok) {
-          setAuthorized(false);
-          setLoading(false);
-          return;
-        }
-
-        setAuthorized(true);
-
-        // сохраняем пользователя и сотрудников в общий state
-        setState((s) => ({
-          ...s,
-          currentUser: user,
-          employees
-        }));
-
-        setLoading(false);
-      } catch {
-        if (!cancelled) {
-          setAuthorized(false);
-          setLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [setState]);
 
   const list = useMemo(() => {
     const qq = q.trim().toLowerCase();
@@ -116,7 +28,7 @@ export default function Employees({ state, setState, goEmployee }) {
       name: form.name.trim(),
       phone: form.phone.trim(),
       email: form.email.trim(),
-      dept: form.dept.trim() || state.currentUser?.department || "",
+      dept: form.dept.trim(),
       cars: []
     };
 
@@ -124,25 +36,6 @@ export default function Employees({ state, setState, goEmployee }) {
     setForm({ name: "", phone: "", email: "", dept: "" });
     setOpen(false);
   };
-
-  if (loading) {
-    return (
-      <div className="content">
-        <EmptyState title="Загрузка…" hint="Проверяем доступ и получаем сотрудников." />
-      </div>
-    );
-  }
-
-  if (authorized === false) {
-    return (
-      <div className="content">
-        <EmptyState
-          title="Пройдите регистрацию через бота"
-          hint="После регистрации откройте мини-приложение ещё раз."
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="content">
@@ -155,7 +48,7 @@ export default function Employees({ state, setState, goEmployee }) {
       {(state.employees || []).length === 0 ? (
         <EmptyState
           title="Сотрудников пока нет"
-          hint="В этом отделе пока нет сотрудников."
+          hint="Добавьте первого сотрудника"
           action={
             <button className="btn primary" onClick={() => setOpen(true)}>
               + Добавить
@@ -210,9 +103,6 @@ export default function Employees({ state, setState, goEmployee }) {
                 label="Отдел"
                 value={form.dept}
                 onChange={(e) => setForm({ ...form, dept: e.target.value })}
-                placeholder={
-                  state.currentUser?.department ? `По умолчанию: ${state.currentUser.department}` : ""
-                }
               />
             </div>
 
