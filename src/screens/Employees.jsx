@@ -19,14 +19,18 @@ function normalizeApiResponse(raw) {
     (Array.isArray(data?.["Сотрудники"]) && data["Сотрудники"]) ||
     [];
 
-  // приводим к формату, который уже ждёт UI (name/phone/email/dept/cars)
+  // приводим к формату, который уже ждёт UI
   const employees = employeesRaw.map((e) => ({
     id: e.id ?? uid(),
     name: e.name ?? e.fio ?? e.FIO ?? "",
-    phone: e.phone ? (String(e.phone).startsWith("+") ? e.phone : `+${e.phone}`) : "",
+    phone: e.phone
+      ? String(e.phone).startsWith("+")
+        ? String(e.phone)
+        : `+${String(e.phone)}`
+      : "",
     email: e.email ?? "",
-    dept: user?.department ?? "",
-    cars: Array.isArray(e.cars) ? e.cars : []
+    dept: e.dept ?? e.department ?? user?.department ?? "",
+    cars: Array.isArray(e.cars) ? e.cars : [],
   }));
 
   return { ok, user, employees };
@@ -35,7 +39,12 @@ function normalizeApiResponse(raw) {
 export default function Employees({ state, setState, goEmployee }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", phone: "", email: "", dept: "" });
+  const [form, setForm] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    dept: "",
+  });
 
   // статусы загрузки/авторизации
   const [loading, setLoading] = useState(true);
@@ -72,10 +81,6 @@ export default function Employees({ state, setState, goEmployee }) {
         const raw = await api.employeeCheck(payload);
         const { ok, user, employees } = normalizeApiResponse(raw);
 
-        // n8n может вернуть объект или массив с 1 элементом — нормализуем
-        const data = Array.isArray(raw) ? raw[0] : raw;
-
-        const ok = Boolean(data?.authorized ?? data?.ok ?? data?.result);
         if (cancelled) return;
 
         if (!ok) {
@@ -87,29 +92,23 @@ export default function Employees({ state, setState, goEmployee }) {
         setAuthorized(true);
 
         const depName =
-          data?.user?.department ??
-          data?.department?.name ??
-          data?.department_name ??
-          data?.dept_name ??
+          user?.department ??
+          (Array.isArray(raw) ? raw[0] : raw)?.department?.name ??
+          (Array.isArray(raw) ? raw[0] : raw)?.department_name ??
+          (Array.isArray(raw) ? raw[0] : raw)?.dept_name ??
           "";
 
         setDepartmentName(depName);
 
-        const employeesFromApi = Array.isArray(data?.employees) ? data.employees : [];
-
-        // Записываем в общий state, чтобы детали/машины работали без переписывания
         // сохраняем пользователя и сотрудников в общий state
         setState((s) => ({
           ...s,
-          employees: employeesFromApi,
-          currentUser: data?.user ?? null,
           currentUser: user,
-          employees
+          employees,
         }));
 
         setLoading(false);
       } catch (e) {
-      } catch {
         if (!cancelled) {
           setAuthorized(false);
           setLoading(false);
@@ -124,10 +123,8 @@ export default function Employees({ state, setState, goEmployee }) {
 
   const list = useMemo(() => {
     const qq = q.trim().toLowerCase();
-    if (!qq) return state.employees;
     if (!qq) return state.employees || [];
 
-    return state.employees.filter((e) => {
     return (state.employees || []).filter((e) => {
       const hay = `${e.name} ${e.phone} ${e.email} ${e.dept}`.toLowerCase();
       return hay.includes(qq);
@@ -142,14 +139,19 @@ export default function Employees({ state, setState, goEmployee }) {
       name: form.name.trim(),
       phone: form.phone.trim(),
       email: form.email.trim(),
-      dept: form.dept.trim() || departmentName || "",
+      dept:
+        form.dept.trim() ||
+        departmentName ||
+        state.currentUser?.department ||
+        "",
       cars: [],
-      dept: form.dept.trim() || state.currentUser?.department || "",
-      cars: []
     };
 
-    setState((s) => ({ ...s, employees: [next, ...(s.employees ?? [])] }));
-    setState((s) => ({ ...s, employees: [next, ...(s.employees || [])] }));
+    setState((s) => ({
+      ...s,
+      employees: [next, ...(s.employees || [])],
+    }));
+
     setForm({ name: "", phone: "", email: "", dept: "" });
     setOpen(false);
   };
@@ -158,7 +160,10 @@ export default function Employees({ state, setState, goEmployee }) {
   if (loading) {
     return (
       <div className="content">
-        <EmptyState title="Загрузка…" hint="Проверяем доступ и получаем сотрудников." />
+        <EmptyState
+          title="Загрузка…"
+          hint="Проверяем доступ и получаем сотрудников."
+        />
       </div>
     );
   }
@@ -178,14 +183,12 @@ export default function Employees({ state, setState, goEmployee }) {
   // 3) Авторизован → показываем сотрудников
   return (
     <div className="content">
-
       <Input
         placeholder="Поиск по имени / телефону"
         value={q}
         onChange={(e) => setQ(e.target.value)}
       />
 
-      {state.employees.length === 0 ? (
       {(state.employees || []).length === 0 ? (
         <EmptyState
           title="Сотрудников пока нет"
@@ -203,11 +206,11 @@ export default function Employees({ state, setState, goEmployee }) {
           <Card key={e.id} onClick={() => goEmployee(e.id)}>
             <div className="row">
               <div className="col">
-                <div className="big">{e.name}</div>
                 <div className="big">{e.name || "Без имени"}</div>
                 {e.phone ? <div className="muted">{e.phone}</div> : null}
-                <div className="muted">Машин: {e.cars?.length ?? 0}</div>
                 {e.email ? <div className="muted">{e.email}</div> : null}
+                <div className="muted">Отдел: {e.dept || "Не указан"}</div>
+                <div className="muted">Машин: {e.cars?.length ?? 0}</div>
               </div>
               <div className="muted" style={{ fontWeight: 900 }}>
                 ›
@@ -246,9 +249,12 @@ export default function Employees({ state, setState, goEmployee }) {
                 label="Отдел"
                 value={form.dept}
                 onChange={(e) => setForm({ ...form, dept: e.target.value })}
-                placeholder={departmentName ? `По умолчанию: ${departmentName}` : ""}
                 placeholder={
-                  state.currentUser?.department ? `По умолчанию: ${state.currentUser.department}` : ""
+                  departmentName || state.currentUser?.department
+                    ? `По умолчанию: ${
+                        departmentName || state.currentUser?.department
+                      }`
+                    : ""
                 }
               />
             </div>
@@ -262,7 +268,6 @@ export default function Employees({ state, setState, goEmployee }) {
                 onClick={addEmployee}
                 disabled={!form.name.trim()}
               >
-              <button className="btn primary" onClick={addEmployee} disabled={!form.name.trim()}>
                 Сохранить
               </button>
             </div>
