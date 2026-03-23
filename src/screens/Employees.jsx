@@ -7,19 +7,20 @@ import { uid } from "../lib/utils.js";
 import { api } from "../lib/api.js";
 import { getTgContext } from "../lib/tg.js";
 
+const ADD_EMPLOYEE_WEBHOOK =
+  "https://n8n.lpaderina.ru/webhook-test/add_employee";
+
 function normalizeApiResponse(raw) {
   const data = Array.isArray(raw) ? raw[0] : raw;
   const ok = Boolean(data?.authorized ?? data?.ok ?? data?.result);
 
   const user = data?.user ?? null;
 
-  // поддержка разных ключей для массива сотрудников
   const employeesRaw =
     (Array.isArray(data?.employees) && data.employees) ||
     (Array.isArray(data?.["Сотрудники"]) && data["Сотрудники"]) ||
     [];
 
-  // приводим к формату, который уже ждёт UI
   const employees = employeesRaw.map((e) => ({
     id: e.id ?? uid(),
     name: e.name ?? e.fio ?? e.FIO ?? "",
@@ -46,12 +47,11 @@ export default function Employees({ state, setState, goEmployee }) {
     dept: "",
   });
 
-  // статусы загрузки/авторизации
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(null); // null | true | false
   const [departmentName, setDepartmentName] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  // При открытии экрана: проверяем регистрацию и получаем сотрудников отдела
   useEffect(() => {
     let cancelled = false;
 
@@ -62,7 +62,6 @@ export default function Employees({ state, setState, goEmployee }) {
         const ctx = getTgContext();
         const userId = ctx?.user_id ?? null;
 
-        // Если открыли не из Telegram WebApp — userId будет null
         if (!userId) {
           if (!cancelled) {
             setAuthorized(false);
@@ -75,7 +74,6 @@ export default function Employees({ state, setState, goEmployee }) {
           event: "employee_open",
           user_id: userId,
           ts: new Date().toISOString(),
-          // initData: ctx?.initData ?? "" // если нужно валидировать подпись
         };
 
         const raw = await api.employeeCheck(payload);
@@ -100,7 +98,6 @@ export default function Employees({ state, setState, goEmployee }) {
 
         setDepartmentName(depName);
 
-        // сохраняем пользователя и сотрудников в общий state
         setState((s) => ({
           ...s,
           currentUser: user,
@@ -131,8 +128,11 @@ export default function Employees({ state, setState, goEmployee }) {
     });
   }, [q, state.employees]);
 
-  const addEmployee = () => {
-    if (!form.name.trim()) return;
+  const addEmployee = async () => {
+    if (!form.name.trim() || saving) return;
+
+    const ctx = getTgContext();
+    const userId = ctx?.user_id ?? null;
 
     const next = {
       id: uid(),
@@ -147,16 +147,50 @@ export default function Employees({ state, setState, goEmployee }) {
       cars: [],
     };
 
-    setState((s) => ({
-      ...s,
-      employees: [next, ...(s.employees || [])],
-    }));
+    const payload = {
+      event: "add_employee",
+      ts: new Date().toISOString(),
+      user_id: userId,
+      current_user: state.currentUser ?? null,
+      employee: {
+        id: next.id,
+        name: next.name,
+        phone: next.phone,
+        email: next.email,
+        dept: next.dept,
+      },
+    };
 
-    setForm({ name: "", phone: "", email: "", dept: "" });
-    setOpen(false);
+    try {
+      setSaving(true);
+
+      const res = await fetch(ADD_EMPLOYEE_WEBHOOK, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Webhook error: ${res.status}`);
+      }
+
+      setState((s) => ({
+        ...s,
+        employees: [next, ...(s.employees || [])],
+      }));
+
+      setForm({ name: "", phone: "", email: "", dept: "" });
+      setOpen(false);
+    } catch (e) {
+      console.error("addEmployee error:", e);
+      alert("Не удалось сохранить сотрудника. Проверьте вебхук или сеть.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  // 1) Лоадер
   if (loading) {
     return (
       <div className="content">
@@ -168,7 +202,6 @@ export default function Employees({ state, setState, goEmployee }) {
     );
   }
 
-  // 2) Не авторизован
   if (authorized === false) {
     return (
       <div className="content">
@@ -180,7 +213,6 @@ export default function Employees({ state, setState, goEmployee }) {
     );
   }
 
-  // 3) Авторизован → показываем сотрудников
   return (
     <div className="content">
       <Input
@@ -225,7 +257,7 @@ export default function Employees({ state, setState, goEmployee }) {
       </button>
 
       {open ? (
-        <div className="modalBack" onMouseDown={() => setOpen(false)}>
+        <div className="modalBack" onMouseDown={() => !saving && setOpen(false)}>
           <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
             <div className="modalTitle">Добавить сотрудника</div>
 
@@ -260,15 +292,19 @@ export default function Employees({ state, setState, goEmployee }) {
             </div>
 
             <div className="modalActions">
-              <button className="btn" onClick={() => setOpen(false)}>
+              <button
+                className="btn"
+                onClick={() => setOpen(false)}
+                disabled={saving}
+              >
                 Отмена
               </button>
               <button
                 className="btn primary"
                 onClick={addEmployee}
-                disabled={!form.name.trim()}
+                disabled={!form.name.trim() || saving}
               >
-                Сохранить
+                {saving ? "Сохраняем..." : "Сохранить"}
               </button>
             </div>
           </div>
