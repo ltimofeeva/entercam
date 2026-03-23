@@ -10,9 +10,6 @@ import { getTgContext } from "../lib/tg.js";
 const ADD_EMPLOYEE_WEBHOOK =
   "https://n8n.lpaderina.ru/webhook-test/add_employee";
 
-const DELETE_EMPLOYEE_WEBHOOK =
-  "https://n8n.lpaderina.ru/webhook-test/delete_employee";
-
 function normalizeApiResponse(raw) {
   const data = Array.isArray(raw) ? raw[0] : raw;
   const ok = Boolean(data?.authorized ?? data?.ok ?? data?.result);
@@ -51,10 +48,9 @@ export default function Employees({ state, setState, goEmployee }) {
   });
 
   const [loading, setLoading] = useState(true);
-  const [authorized, setAuthorized] = useState(null); // null | true | false
+  const [authorized, setAuthorized] = useState(null);
   const [departmentName, setDepartmentName] = useState("");
   const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -110,6 +106,7 @@ export default function Employees({ state, setState, goEmployee }) {
 
         setLoading(false);
       } catch (e) {
+        console.error("employeeCheck error:", e);
         if (!cancelled) {
           setAuthorized(false);
           setLoading(false);
@@ -185,67 +182,18 @@ export default function Employees({ state, setState, goEmployee }) {
         employees: [next, ...(s.employees || [])],
       }));
 
-      setForm({ name: "", phone: "", email: "", dept: "" });
+      setForm({
+        name: "",
+        phone: "",
+        email: "",
+        dept: "",
+      });
       setOpen(false);
     } catch (e) {
       console.error("addEmployee error:", e);
       alert("Не удалось сохранить сотрудника. Проверьте вебхук или сеть.");
     } finally {
       setSaving(false);
-    }
-  };
-
-  const deleteEmployee = async (employee) => {
-    if (!employee?.id || deletingId) return;
-
-    const confirmed = window.confirm(
-      `Удалить сотрудника${employee.name ? `: ${employee.name}` : ""}?`
-    );
-
-    if (!confirmed) return;
-
-    const ctx = getTgContext();
-    const userId = ctx?.user_id ?? null;
-
-    const payload = {
-      event: "delete_employee",
-      ts: new Date().toISOString(),
-      user_id: userId,
-      current_user: state.currentUser ?? null,
-      employee: {
-        id: employee.id,
-        name: employee.name ?? "",
-        phone: employee.phone ?? "",
-        email: employee.email ?? "",
-        dept: employee.dept ?? "",
-        cars: Array.isArray(employee.cars) ? employee.cars : [],
-      },
-    };
-
-    try {
-      setDeletingId(employee.id);
-
-      const res = await fetch(DELETE_EMPLOYEE_WEBHOOK, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Webhook error: ${res.status}`);
-      }
-
-      setState((s) => ({
-        ...s,
-        employees: (s.employees || []).filter((e) => e.id !== employee.id),
-      }));
-    } catch (e) {
-      console.error("deleteEmployee error:", e);
-      alert("Не удалось удалить сотрудника. Проверьте вебхук или сеть.");
-    } finally {
-      setDeletingId(null);
     }
   };
 
@@ -294,8 +242,8 @@ export default function Employees({ state, setState, goEmployee }) {
       <div className="list">
         {list.map((e) => (
           <Card key={e.id} onClick={() => goEmployee(e.id)}>
-            <div className="row" style={{ alignItems: "flex-start", gap: 12 }}>
-              <div className="col" style={{ flex: 1 }}>
+            <div className="row">
+              <div className="col">
                 <div className="big">{e.name || "Без имени"}</div>
                 {e.phone ? <div className="muted">{e.phone}</div> : null}
                 {e.email ? <div className="muted">{e.email}</div> : null}
@@ -303,25 +251,8 @@ export default function Employees({ state, setState, goEmployee }) {
                 <div className="muted">Машин: {e.cars?.length ?? 0}</div>
               </div>
 
-              <div
-                className="col"
-                style={{ gap: 8 }}
-                onClick={(evt) => evt.stopPropagation()}
-              >
-                <button
-                  className="btn"
-                  onClick={() => goEmployee(e.id)}
-                  disabled={deletingId === e.id}
-                >
-                  Открыть
-                </button>
-                <button
-                  className="btn"
-                  onClick={() => deleteEmployee(e)}
-                  disabled={deletingId !== null}
-                >
-                  {deletingId === e.id ? "Удаление..." : "Удалить"}
-                </button>
+              <div className="muted" style={{ fontWeight: 900 }}>
+                ›
               </div>
             </div>
           </Card>
