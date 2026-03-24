@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Card from "../components/Card.jsx";
 import Input from "../components/Input.jsx";
 import Modal from "../components/Modal.jsx";
@@ -8,6 +8,39 @@ import { getTgContext } from "../lib/tg.js";
 
 const DELETE_EMPLOYEE_WEBHOOK =
   "https://n8n.lpaderina.ru/webhook-test/delete_employee";
+
+const GET_EMPLOYEE_CARS_WEBHOOK =
+  "https://n8n.lpaderina.ru/webhook-test/get_employee_cars";
+
+function normalizeCarsResponse(raw) {
+  const data = Array.isArray(raw) ? raw[0] : raw;
+
+  const carsRaw =
+    (Array.isArray(data?.cars) && data.cars) ||
+    (Array.isArray(data?.["Машины"]) && data["Машины"]) ||
+    (Array.isArray(data?.vehicles) && data.vehicles) ||
+    [];
+
+  return carsRaw
+    .map((c) => {
+      if (typeof c === "string") {
+        const plate = normPlate(c);
+        return plate ? { id: uid(), plate } : null;
+      }
+
+      const plate = normPlate(
+        c?.plate ?? c?.number ?? c?.gosnomer ?? c?.car_number ?? ""
+      );
+
+      if (!plate) return null;
+
+      return {
+        id: c?.id ?? uid(),
+        plate,
+      };
+    })
+    .filter(Boolean);
+}
 
 export default function EmployeeDetail({ state, setState, employeeId, onBack }) {
   const emp = useMemo(
@@ -20,6 +53,72 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
   const [confirm, setConfirm] = useState({ open: false, carId: null, carPlate: "" });
   const [confirmEmp, setConfirmEmp] = useState(false);
   const [deletingEmployee, setDeletingEmployee] = useState(false);
+  const [carsLoading, setCarsLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadEmployeeCars = async () => {
+      if (!emp?.id) return;
+
+      try {
+        setCarsLoading(true);
+
+        const ctx = getTgContext();
+        const userId = ctx?.user_id ?? null;
+
+        const payload = {
+          event: "get_employee_cars",
+          ts: new Date().toISOString(),
+          user_id: userId,
+          current_user: state.currentUser ?? null,
+          employee: {
+            id: emp.id,
+            name: emp.name ?? "",
+            phone: emp.phone ?? "",
+            email: emp.email ?? "",
+            dept: emp.dept ?? "",
+          },
+        };
+
+        const res = await fetch(GET_EMPLOYEE_CARS_WEBHOOK, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          throw new Error(`Webhook error: ${res.status}`);
+        }
+
+        const raw = await res.json();
+        const cars = normalizeCarsResponse(raw);
+
+        if (cancelled) return;
+
+        setState((s) => ({
+          ...s,
+          employees: (s.employees || []).map((e) =>
+            e.id === emp.id ? { ...e, cars } : e
+          ),
+        }));
+      } catch (e) {
+        console.error("loadEmployeeCars error:", e);
+      } finally {
+        if (!cancelled) {
+          setCarsLoading(false);
+        }
+      }
+    };
+
+    loadEmployeeCars();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [emp?.id, setState, state.currentUser]);
 
   if (!emp) {
     return (
@@ -136,7 +235,9 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
         </button>
       </div>
 
-      {(emp.cars?.length ?? 0) === 0 ? (
+      {carsLoading ? (
+        <EmptyState title="Загрузка машин..." hint="Получаем номера сотрудника." />
+      ) : (emp.cars?.length ?? 0) === 0 ? (
         <EmptyState title="Пока нет машин" hint="Добавьте госномер сотрудника." />
       ) : null}
 
