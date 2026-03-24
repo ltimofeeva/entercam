@@ -17,6 +17,34 @@ export default function App() {
 
   useEffect(() => initTg(), []);
   useEffect(() => saveState(state), [state]);
+  useEffect(() => {
+  if (tab === "guests") {
+    fetch("https://n8n.lpaderina.ru/webhook-test/guest_get", {
+      method: "POST", // или GET — смотри как настроен вебхук в n8n
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user: state.currentUser || null,
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("Guests webhook response:", data);
+
+        // если нужно — сразу обновляешь гостей
+        if (data?.guests) {
+          setState((s) => ({
+            ...s,
+            guests: data.guests,
+          }));
+        }
+      })
+      .catch((err) => {
+        console.error("Guests webhook error:", err);
+      });
+  }
+}, [tab]);
 
   const title = useMemo(() => {
     if (view.name === "employee") return "Сотрудник";
