@@ -7,13 +7,13 @@ import { normPlate, uid } from "../lib/utils.js";
 import { getTgContext } from "../lib/tg.js";
 
 const DELETE_EMPLOYEE_WEBHOOK =
-  "https://n8n.lpaderina.ru/webhook-test/delete_employee";
+  "https://n8n.lpaderina.ru/webhook/delete_employee";
 
 const GET_EMPLOYEE_CARS_WEBHOOK =
-  "https://n8n.lpaderina.ru/webhook-test/get_employee_cars";
+  "https://n8n.lpaderina.ru/webhook/get_employee_cars";
 
 const ADD_EMPLOYEE_CAR_WEBHOOK =
-  "https://n8n.lpaderina.ru/webhook-test/add_employee_car";
+  "https://n8n.lpaderina.ru/webhook/add_employee_car";
 
 const DELETE_EMPLOYEE_CAR_WEBHOOK =
   "https://n8n.lpaderina.ru/webhook-test/delete_employee_car";
