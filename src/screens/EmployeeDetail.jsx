@@ -7,13 +7,16 @@ import { normPlate, uid } from "../lib/utils.js";
 import { getTgContext } from "../lib/tg.js";
 
 const DELETE_EMPLOYEE_WEBHOOK =
-  "https://n8n.lpaderina.ru/webhook/delete_employee";
+  "https://n8n.lpaderina.ru/webhook-test/delete_employee";
 
 const GET_EMPLOYEE_CARS_WEBHOOK =
   "https://n8n.lpaderina.ru/webhook-test/get_employee_cars";
 
 const ADD_EMPLOYEE_CAR_WEBHOOK =
   "https://n8n.lpaderina.ru/webhook-test/add_employee_car";
+
+const DELETE_EMPLOYEE_CAR_WEBHOOK =
+  "https://n8n.lpaderina.ru/webhook-test/delete_employee_car";
 
 function normalizeCarsResponse(raw) {
   const root = Array.isArray(raw) ? raw[0] : raw;
@@ -61,6 +64,7 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
   const [deletingEmployee, setDeletingEmployee] = useState(false);
   const [carsLoading, setCarsLoading] = useState(false);
   const [addingCar, setAddingCar] = useState(false);
+  const [deletingCarId, setDeletingCarId] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -212,15 +216,64 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
     }
   };
 
-  const deleteCar = (carId) => {
-    setState((s) => ({
-      ...s,
-      employees: (s.employees || []).map((e) =>
-        e.id === emp.id
-          ? { ...e, cars: (e.cars ?? []).filter((c) => c.id !== carId) }
-          : e
-      ),
-    }));
+  const deleteCar = async (carId) => {
+    if (!carId || deletingCarId) return;
+
+    const car = (emp.cars || []).find((c) => c.id === carId);
+    if (!car) return;
+
+    const ctx = getTgContext();
+    const userId = ctx?.user_id ?? null;
+
+    const payload = {
+      event: "delete_employee_car",
+      ts: new Date().toISOString(),
+      user_id: userId,
+      current_user: state.currentUser ?? null,
+      employee: {
+        id: emp.id,
+        name: emp.name ?? "",
+        phone: emp.phone ?? "",
+        email: emp.email ?? "",
+        dept: emp.dept ?? "",
+      },
+      car: {
+        id: car.id ?? "",
+        plate: car.plate ?? "",
+      },
+    };
+
+    try {
+      setDeletingCarId(carId);
+
+      const res = await fetch(DELETE_EMPLOYEE_CAR_WEBHOOK, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Webhook error: ${res.status}`);
+      }
+
+      setState((s) => ({
+        ...s,
+        employees: (s.employees || []).map((e) =>
+          e.id === emp.id
+            ? { ...e, cars: (e.cars ?? []).filter((c) => c.id !== carId) }
+            : e
+        ),
+      }));
+
+      setConfirm({ open: false, carId: null, carPlate: "" });
+    } catch (e) {
+      console.error("deleteCar error:", e);
+      alert("Не удалось удалить номер. Проверьте вебхук или сеть.");
+    } finally {
+      setDeletingCarId(null);
+    }
   };
 
   const deleteEmployee = async () => {
@@ -311,8 +364,9 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
                 onClick={() =>
                   setConfirm({ open: true, carId: c.id, carPlate: c.plate })
                 }
+                disabled={deletingCarId !== null}
               >
-                Удалить
+                {deletingCarId === c.id ? "Удаление..." : "Удалить"}
               </button>
             </div>
           </Card>
@@ -362,7 +416,9 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
       <Modal
         open={confirm.open}
         title={`Удалить номер ${confirm.carPlate}?`}
-        onClose={() => setConfirm({ open: false, carId: null, carPlate: "" })}
+        onClose={() =>
+          !deletingCarId && setConfirm({ open: false, carId: null, carPlate: "" })
+        }
         actions={
           <>
             <button
@@ -370,17 +426,16 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
               onClick={() =>
                 setConfirm({ open: false, carId: null, carPlate: "" })
               }
+              disabled={deletingCarId !== null}
             >
               Отмена
             </button>
             <button
               className="btn danger"
-              onClick={() => {
-                deleteCar(confirm.carId);
-                setConfirm({ open: false, carId: null, carPlate: "" });
-              }}
+              onClick={() => deleteCar(confirm.carId)}
+              disabled={deletingCarId !== null}
             >
-              Удалить
+              {deletingCarId === confirm.carId ? "Удаление..." : "Удалить"}
             </button>
           </>
         }
