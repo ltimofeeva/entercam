@@ -12,16 +12,22 @@ const DELETE_EMPLOYEE_WEBHOOK =
 const GET_EMPLOYEE_CARS_WEBHOOK =
   "https://n8n.lpaderina.ru/webhook-test/get_employee_cars";
 
+const ADD_EMPLOYEE_CAR_WEBHOOK =
+  "https://n8n.lpaderina.ru/webhook-test/add_employee_car";
+
 function normalizeCarsResponse(raw) {
-  const data = Array.isArray(raw) ? raw[0] : raw;
+  const root = Array.isArray(raw) ? raw[0] : raw;
+  const data = Array.isArray(root?.cars)
+    ? root.cars
+    : Array.isArray(root?.data)
+    ? root.data
+    : Array.isArray(root?.vehicles)
+    ? root.vehicles
+    : Array.isArray(root)
+    ? root
+    : [];
 
-  const carsRaw =
-    (Array.isArray(data?.cars) && data.cars) ||
-    (Array.isArray(data?.["Машины"]) && data["Машины"]) ||
-    (Array.isArray(data?.vehicles) && data.vehicles) ||
-    [];
-
-  return carsRaw
+  return data
     .map((c) => {
       if (typeof c === "string") {
         const plate = normPlate(c);
@@ -29,7 +35,7 @@ function normalizeCarsResponse(raw) {
       }
 
       const plate = normPlate(
-        c?.plate ?? c?.number ?? c?.gosnomer ?? c?.car_number ?? ""
+        c?.plate ?? c?.carNumber ?? c?.number ?? c?.gosnomer ?? ""
       );
 
       if (!plate) return null;
@@ -54,6 +60,7 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
   const [confirmEmp, setConfirmEmp] = useState(false);
   const [deletingEmployee, setDeletingEmployee] = useState(false);
   const [carsLoading, setCarsLoading] = useState(false);
+  const [addingCar, setAddingCar] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -135,21 +142,74 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
     );
   }
 
-  const addCar = () => {
+  const addCar = async () => {
     const p = normPlate(plate);
-    if (!p) return;
+    if (!p || addingCar) return;
 
-    setState((s) => ({
-      ...s,
-      employees: (s.employees || []).map((e) =>
-        e.id === emp.id
-          ? { ...e, cars: [{ id: uid(), plate: p }, ...(e.cars ?? [])] }
-          : e
-      ),
-    }));
+    const alreadyExists = (emp.cars || []).some((c) => normPlate(c.plate) === p);
+    if (alreadyExists) {
+      alert("Этот номер уже добавлен сотруднику.");
+      return;
+    }
 
-    setPlate("");
-    setAddOpen(false);
+    const ctx = getTgContext();
+    const userId = ctx?.user_id ?? null;
+
+    const newCar = {
+      id: uid(),
+      plate: p,
+    };
+
+    const payload = {
+      event: "add_employee_car",
+      ts: new Date().toISOString(),
+      user_id: userId,
+      current_user: state.currentUser ?? null,
+      employee: {
+        id: emp.id,
+        name: emp.name ?? "",
+        phone: emp.phone ?? "",
+        email: emp.email ?? "",
+        dept: emp.dept ?? "",
+      },
+      car: {
+        id: newCar.id,
+        plate: newCar.plate,
+      },
+    };
+
+    try {
+      setAddingCar(true);
+
+      const res = await fetch(ADD_EMPLOYEE_CAR_WEBHOOK, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Webhook error: ${res.status}`);
+      }
+
+      setState((s) => ({
+        ...s,
+        employees: (s.employees || []).map((e) =>
+          e.id === emp.id
+            ? { ...e, cars: [newCar, ...(e.cars ?? [])] }
+            : e
+        ),
+      }));
+
+      setPlate("");
+      setAddOpen(false);
+    } catch (e) {
+      console.error("addCar error:", e);
+      alert("Не удалось добавить номер. Проверьте вебхук или сеть.");
+    } finally {
+      setAddingCar(false);
+    }
   };
 
   const deleteCar = (carId) => {
@@ -268,18 +328,22 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
       <Modal
         open={addOpen}
         title="Добавить машину"
-        onClose={() => setAddOpen(false)}
+        onClose={() => !addingCar && setAddOpen(false)}
         actions={
           <>
-            <button className="btn" onClick={() => setAddOpen(false)}>
+            <button
+              className="btn"
+              onClick={() => setAddOpen(false)}
+              disabled={addingCar}
+            >
               Отмена
             </button>
             <button
               className="btn primary"
               onClick={addCar}
-              disabled={!normPlate(plate)}
+              disabled={!normPlate(plate) || addingCar}
             >
-              Добавить
+              {addingCar ? "Сохраняем..." : "Добавить"}
             </button>
           </>
         }
