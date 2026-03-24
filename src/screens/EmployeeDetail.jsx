@@ -16,7 +16,7 @@ const ADD_EMPLOYEE_CAR_WEBHOOK =
   "https://n8n.lpaderina.ru/webhook/add_employee_car";
 
 const DELETE_EMPLOYEE_CAR_WEBHOOK =
-  "https://n8n.lpaderina.ru/webhook-test/delete_employee_car";
+  "https://n8n.lpaderina.ru/webhook/delete_employee_car";
 
 function normalizeCarsResponse(raw) {
   const root = Array.isArray(raw) ? raw[0] : raw;
