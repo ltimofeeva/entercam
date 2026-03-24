@@ -120,9 +120,6 @@ export default function App() {
 
   const left =
     view.name === "employee" ? (
-      <button className="btn ghost" onClick={onBack}>
-        ←
-      </button>
     ) : null;
 
   const right = null;
