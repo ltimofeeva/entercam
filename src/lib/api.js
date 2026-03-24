@@ -1,4 +1,4 @@
-const N8N_EMPLOYEE_WEBHOOK = "https://n8n.lpaderina.ru/webhook-test/employee";
+const N8N_EMPLOYEE_WEBHOOK = "https://n8n.lpaderina.ru/webhook/employee";
 
 async function safeJson(res) {
   const text = await res.text().catch(() => "");
