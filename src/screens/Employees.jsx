@@ -248,7 +248,6 @@ export default function Employees({ state, setState, goEmployee }) {
                 {e.phone ? <div className="muted">{e.phone}</div> : null}
                 {e.email ? <div className="muted">{e.email}</div> : null}
                 <div className="muted">Отдел: {e.dept || "Не указан"}</div>
-                <div className="muted">Машин: {e.cars?.length ?? 0}</div>
               </div>
 
               <div className="muted" style={{ fontWeight: 900 }}>
