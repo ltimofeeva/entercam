@@ -8,7 +8,7 @@ import { api } from "../lib/api.js";
 import { getTgContext } from "../lib/tg.js";
 
 const ADD_EMPLOYEE_WEBHOOK =
-  "https://n8n.lpaderina.ru/webhook-test/add_employee";
+  "https://n8n.lpaderina.ru/webhook/add_employee";
 
 function normalizeApiResponse(raw) {
   const data = Array.isArray(raw) ? raw[0] : raw;
