@@ -150,6 +150,11 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
     const p = normPlate(plate);
     if (!p || addingCar) return;
 
+    if (!emp?.id) {
+      alert("У сотрудника отсутствует корректный ID. Проверьте ответ вебхука add_employee.");
+      return;
+    }
+
     const alreadyExists = (emp.cars || []).some((c) => normPlate(c.plate) === p);
     if (alreadyExists) {
       alert("Этот номер уже добавлен сотруднику.");
