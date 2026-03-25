@@ -16,17 +16,20 @@ function normalizeGuestResponse(raw) {
 
   return items.map((item) => ({
     id: item.uid || crypto.randomUUID(),
-    plate: item["identifier-"] || "",
+    plate: item.identifier || "",
     entryDate: item.entryDate || "",
     exitDate: item.exitDate || "",
-    active: true,
     name: item.name || "",
     type: item.type || "",
   }));
 }
 
 export default function App() {
-  const [state, setState] = useState(() => loadState());
+  const [state, setState] = useState(() => ({
+    ...loadState(),
+    guests: loadState()?.guests || [],
+  }));
+
   const [tab, setTab] = useState("employees"); // employees | guests | gate
   const [view, setView] = useState({ name: "tab", employeeId: null });
   const [guestsLoading, setGuestsLoading] = useState(false);
@@ -42,7 +45,7 @@ export default function App() {
         setGuestsLoading(true);
 
         const res = await fetch("https://n8n.lpaderina.ru/webhook-test/guest_get", {
-          method: "POST", // если в n8n webhook настроен как GET — поменяй на GET и убери body
+          method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
