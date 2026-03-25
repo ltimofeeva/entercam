@@ -85,7 +85,6 @@ export default function Guests({ state, setState, allowExit }) {
             <div className="col">
               <div className="row">
                 <div className="big">{g.plate}</div>
-                <span className="pill">{g.active ? "Активна" : "Неактивна"}</span>
               </div>
               <div className="muted">Заезд: {fmtDate(g.entryDate)}</div>
               {g.exitDate ? <div className="muted">До: {fmtDate(g.exitDate)}</div> : null}
