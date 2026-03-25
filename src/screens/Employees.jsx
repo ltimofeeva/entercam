@@ -1,4 +1,3 @@
-// src/screens/Employees.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import Card from "../components/Card.jsx";
 import Input from "../components/Input.jsx";
@@ -35,6 +34,33 @@ function normalizeApiResponse(raw) {
   }));
 
   return { ok, user, employees };
+}
+
+function normalizeCreatedEmployeeResponse(raw, fallback) {
+  const data = Array.isArray(raw) ? raw[0] : raw;
+
+  const employeeRaw =
+    data?.employee ??
+    data?.data?.employee ??
+    data?.data ??
+    data?.result ??
+    data;
+
+  return {
+    id: employeeRaw?.id ?? fallback.id,
+    name: employeeRaw?.name ?? employeeRaw?.fio ?? fallback.name,
+    phone: employeeRaw?.phone
+      ? String(employeeRaw.phone).startsWith("+")
+        ? String(employeeRaw.phone)
+        : `+${String(employeeRaw.phone)}`
+      : fallback.phone,
+    email: employeeRaw?.email ?? fallback.email,
+    dept:
+      employeeRaw?.dept ??
+      employeeRaw?.department ??
+      fallback.dept,
+    cars: Array.isArray(employeeRaw?.cars) ? employeeRaw.cars : fallback.cars,
+  };
 }
 
 export default function Employees({ state, setState, goEmployee }) {
@@ -135,7 +161,7 @@ export default function Employees({ state, setState, goEmployee }) {
     const ctx = getTgContext();
     const userId = ctx?.user_id ?? null;
 
-    const next = {
+    const draftEmployee = {
       id: uid(),
       name: form.name.trim(),
       phone: form.phone.trim(),
@@ -154,11 +180,10 @@ export default function Employees({ state, setState, goEmployee }) {
       user_id: userId,
       current_user: state.currentUser ?? null,
       employee: {
-        id: next.id,
-        name: next.name,
-        phone: next.phone,
-        email: next.email,
-        dept: next.dept,
+        name: draftEmployee.name,
+        phone: draftEmployee.phone,
+        email: draftEmployee.email,
+        dept: draftEmployee.dept,
       },
     };
 
@@ -177,9 +202,12 @@ export default function Employees({ state, setState, goEmployee }) {
         throw new Error(`Webhook error: ${res.status}`);
       }
 
+      const raw = await res.json();
+      const savedEmployee = normalizeCreatedEmployeeResponse(raw, draftEmployee);
+
       setState((s) => ({
         ...s,
-        employees: [next, ...(s.employees || [])],
+        employees: [savedEmployee, ...(s.employees || [])],
       }));
 
       setForm({
