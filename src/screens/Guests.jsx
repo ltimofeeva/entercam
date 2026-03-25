@@ -8,6 +8,7 @@ import { fmtDate, normPlate, uid } from "../lib/utils.js";
 export default function Guests({ state, setState, allowExit }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ plate: "", entryDate: "", exitDate: "" });
 
   const list = useMemo(() => {
@@ -16,20 +17,50 @@ export default function Guests({ state, setState, allowExit }) {
     return state.guests.filter((g) => normPlate(g.plate).includes(qq));
   }, [q, state.guests]);
 
-  const addGuest = () => {
+  const addGuest = async () => {
     const plate = normPlate(form.plate);
-    if (!plate || !form.entryDate) return;
+    if (!plate || !form.entryDate || saving) return;
 
     const next = {
       id: uid(),
       plate,
       entryDate: form.entryDate,
       exitDate: form.exitDate,
-      active: true
+      active: true,
     };
-    setState((s) => ({ ...s, guests: [next, ...s.guests] }));
-    setForm({ plate: "", entryDate: "", exitDate: "" });
-    setOpen(false);
+
+    try {
+      setSaving(true);
+
+      const res = await fetch("https://n8n.lpaderina.ru/webhook-test/guest_add", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          guest: {
+            id: next.id,
+            plate: next.plate,
+            entryDate: next.entryDate,
+            exitDate: next.exitDate,
+            active: next.active,
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Ошибка webhook: ${res.status}`);
+      }
+
+      setState((s) => ({ ...s, guests: [next, ...s.guests] }));
+      setForm({ plate: "", entryDate: "", exitDate: "" });
+      setOpen(false);
+    } catch (err) {
+      console.error("guest_add webhook error:", err);
+      alert("Не удалось добавить гостевую машину");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const deleteGuest = (id) => {
@@ -76,9 +107,15 @@ export default function Guests({ state, setState, allowExit }) {
         onClose={() => setOpen(false)}
         actions={
           <>
-            <button className="btn" onClick={() => setOpen(false)}>Отмена</button>
-            <button className="btn primary" onClick={addGuest} disabled={!normPlate(form.plate) || !form.entryDate}>
-              Сохранить
+            <button className="btn" onClick={() => setOpen(false)} disabled={saving}>
+              Отмена
+            </button>
+            <button
+              className="btn primary"
+              onClick={addGuest}
+              disabled={!normPlate(form.plate) || !form.entryDate || saving}
+            >
+              {saving ? "Сохранение..." : "Сохранить"}
             </button>
           </>
         }
@@ -92,11 +129,21 @@ export default function Guests({ state, setState, allowExit }) {
           />
           <div className="col" style={{ gap: 6 }}>
             <div className="muted" style={{ fontWeight: 800 }}>Дата заезда*</div>
-            <input className="input" type="date" value={form.entryDate} onChange={(e) => setForm({ ...form, entryDate: e.target.value })} />
+            <input
+              className="input"
+              type="date"
+              value={form.entryDate}
+              onChange={(e) => setForm({ ...form, entryDate: e.target.value })}
+            />
           </div>
           <div className="col" style={{ gap: 6 }}>
             <div className="muted" style={{ fontWeight: 800 }}>Дата выезда (опц.)</div>
-            <input className="input" type="date" value={form.exitDate} onChange={(e) => setForm({ ...form, exitDate: e.target.value })} />
+            <input
+              className="input"
+              type="date"
+              value={form.exitDate}
+              onChange={(e) => setForm({ ...form, exitDate: e.target.value })}
+            />
           </div>
         </div>
       </Modal>
