@@ -51,26 +51,15 @@ function normalizeCarsResponse(raw) {
     .filter(Boolean);
 }
 
-export default function EmployeeDetail({
-  state,
-  setState,
-  employeeId,
-  onBack,
-}) {
+export default function EmployeeDetail({ state, setState, employeeId, onBack }) {
   const emp = useMemo(
     () => (state.employees || []).find((e) => e.id === employeeId),
     [state.employees, employeeId]
   );
 
-  const realEmployeeId = emp?.employeeId ?? emp?.id ?? null;
-
   const [addOpen, setAddOpen] = useState(false);
   const [plate, setPlate] = useState("");
-  const [confirm, setConfirm] = useState({
-    open: false,
-    carId: null,
-    carPlate: "",
-  });
+  const [confirm, setConfirm] = useState({ open: false, carId: null, carPlate: "" });
   const [confirmEmp, setConfirmEmp] = useState(false);
   const [deletingEmployee, setDeletingEmployee] = useState(false);
   const [carsLoading, setCarsLoading] = useState(false);
@@ -81,7 +70,7 @@ export default function EmployeeDetail({
     let cancelled = false;
 
     const loadEmployeeCars = async () => {
-      if (!emp || !realEmployeeId) return;
+      if (!emp?.id) return;
 
       try {
         setCarsLoading(true);
@@ -95,7 +84,7 @@ export default function EmployeeDetail({
           user_id: userId,
           current_user: state.currentUser ?? null,
           employee: {
-            id: realEmployeeId,
+            id: emp.id,
             name: emp.name ?? "",
             phone: emp.phone ?? "",
             email: emp.email ?? "",
@@ -140,7 +129,7 @@ export default function EmployeeDetail({
     return () => {
       cancelled = true;
     };
-  }, [emp, realEmployeeId, setState, state.currentUser]);
+  }, [emp?.id, setState, state.currentUser]);
 
   if (!emp) {
     return (
@@ -159,7 +148,7 @@ export default function EmployeeDetail({
 
   const addCar = async () => {
     const p = normPlate(plate);
-    if (!p || addingCar || !realEmployeeId) return;
+    if (!p || addingCar) return;
 
     const alreadyExists = (emp.cars || []).some((c) => normPlate(c.plate) === p);
     if (alreadyExists) {
@@ -181,7 +170,7 @@ export default function EmployeeDetail({
       user_id: userId,
       current_user: state.currentUser ?? null,
       employee: {
-        id: realEmployeeId,
+        id: emp.id,
         name: emp.name ?? "",
         phone: emp.phone ?? "",
         email: emp.email ?? "",
@@ -228,7 +217,7 @@ export default function EmployeeDetail({
   };
 
   const deleteCar = async (carId) => {
-    if (!carId || deletingCarId || !realEmployeeId) return;
+    if (!carId || deletingCarId) return;
 
     const car = (emp.cars || []).find((c) => c.id === carId);
     if (!car) return;
@@ -242,7 +231,7 @@ export default function EmployeeDetail({
       user_id: userId,
       current_user: state.currentUser ?? null,
       employee: {
-        id: realEmployeeId,
+        id: emp.id,
         name: emp.name ?? "",
         phone: emp.phone ?? "",
         email: emp.email ?? "",
@@ -288,7 +277,7 @@ export default function EmployeeDetail({
   };
 
   const deleteEmployee = async () => {
-    if (deletingEmployee || !realEmployeeId) return;
+    if (deletingEmployee) return;
 
     const ctx = getTgContext();
     const userId = ctx?.user_id ?? null;
@@ -299,7 +288,7 @@ export default function EmployeeDetail({
       user_id: userId,
       current_user: state.currentUser ?? null,
       employee: {
-        id: realEmployeeId,
+        id: emp.id,
         name: emp.name ?? "",
         phone: emp.phone ?? "",
         email: emp.email ?? "",
