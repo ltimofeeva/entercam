@@ -85,23 +85,24 @@ export default function Guests({ state, setState, allowExit }) {
 
       <div className="list">
         {list.map((g) => (
-          <Card key={g.id}>
-            <div className="col">
-              <div className="row">
-                <div className="big">{g.plate}</div>
-                <span className="pill">{g.active ? "Активна" : "Неактивна"}</span>
-              </div>
+         <Card key={g.id}>
+  <div className="col">
+    <div className="row">
+      <div className="big">{g.plate}</div>
+    </div>
 
-              {g.name ? <div className="muted">ФИО: {g.name}</div> : null}
-              {g.entryDate ? <div className="muted">Заезд: {fmtDate(g.entryDate)}</div> : null}
-              {g.exitDate ? <div className="muted">До: {fmtDate(g.exitDate)}</div> : null}
+    {g.name ? <div className="muted">ФИО: {g.name}</div> : null}
 
-              <div className="row" style={{ marginTop: 10 }}>
-                <button className="btn primary" onClick={() => allowExit(g.plate)}>Разрешить выезд</button>
-                <button className="btn danger" onClick={() => deleteGuest(g.id)}>Удалить</button>
-              </div>
-            </div>
-          </Card>
+    <div className="row" style={{ marginTop: 10 }}>
+      <button className="btn primary" onClick={() => allowExit(g.plate)}>
+        Разрешить выезд
+      </button>
+      <button className="btn danger" onClick={() => deleteGuest(g.id)}>
+        Удалить
+      </button>
+    </div>
+  </div>
+</Card>
         ))}
       </div>
 
