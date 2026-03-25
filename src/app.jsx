@@ -11,34 +11,16 @@ import { normPlate } from "./lib/utils.js";
 import { api } from "./lib/api.js";
 
 export default function App() {
-  const [state, setState] = useState(() => ({
-    ...loadState(),
-    employees: loadState()?.employees ?? [],
-    guests: loadState()?.guests ?? [],
-    gateFeed: loadState()?.gateFeed ?? [],
-  }));
-
+  const [state, setState] = useState(() => loadState());
   const [tab, setTab] = useState("employees"); // employees | guests | gate
   const [view, setView] = useState({ name: "tab", employeeId: null });
 
+  useEffect(() => initTg(), []);
+  useEffect(() => saveState(state), [state]);
   useEffect(() => {
-    initTg();
-  }, []);
-
-  useEffect(() => {
-    saveState(state);
-  }, [state]);
-
-  useEffect(() => {
-    if (tab !== "guests") return;
-
-    setState((s) => ({
-      ...s,
-      guests: [],
-    }));
-
+  if (tab === "guests") {
     fetch("https://n8n.lpaderina.ru/webhook-test/guest_get", {
-      method: "POST",
+      method: "POST", // или GET — смотри как настроен вебхук в n8n
       headers: {
         "Content-Type": "application/json",
       },
@@ -46,31 +28,23 @@ export default function App() {
         user: state.currentUser || null,
       }),
     })
-      .then(async (res) => {
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
-        return res.json();
-      })
+      .then((res) => res.json())
       .then((data) => {
         console.log("Guests webhook response:", data);
 
-        const guests = Array.isArray(data?.guests) ? data.guests : [];
-
-        setState((s) => ({
-          ...s,
-          guests,
-        }));
+        // если нужно — сразу обновляешь гостей
+        if (data?.guests) {
+          setState((s) => ({
+            ...s,
+            guests: data.guests,
+          }));
+        }
       })
       .catch((err) => {
         console.error("Guests webhook error:", err);
-
-        setState((s) => ({
-          ...s,
-          guests: [],
-        }));
       });
-  }, [tab, state.currentUser]);
+  }
+}, [tab]);
 
   const title = useMemo(() => {
     if (view.name === "employee") return "Сотрудник";
@@ -81,20 +55,20 @@ export default function App() {
   }, [tab, view.name]);
 
   const subtitle = useMemo(() => {
-    if (tab === "employees" && state.currentUser) {
-      return {
-        fio: state.currentUser.fio,
-        department: state.currentUser.department,
-      };
-    }
+  if (tab === "employees" && state.currentUser) {
+    return {
+      fio: state.currentUser.fio,
+      department: state.currentUser.department
+    };
+  }
 
-    if (view.name === "employee") {
-      const e = (state.employees || []).find((x) => x.id === view.employeeId);
-      return e?.phone ? { single: e.phone } : null;
-    }
+  if (view.name === "employee") {
+    const e = state.employees.find((x) => x.id === view.employeeId);
+    return e?.phone ? { single: e.phone } : null;
+  }
 
-    return null;
-  }, [tab, view, state]);
+  return null;
+}, [tab, view, state]);
 
   const goEmployee = (id) => {
     setView({ name: "employee", employeeId: id });
@@ -106,10 +80,8 @@ export default function App() {
 
   async function allowExit(plateRaw) {
     const plate = normPlate(plateRaw);
-
     try {
       haptic("impact", "medium");
-
       const res = await api.allowExitByPlate(plate);
       if (!res.ok) throw new Error("API error");
 
@@ -117,7 +89,7 @@ export default function App() {
         ...s,
         gateFeed: (s.gateFeed ?? []).map((ev) =>
           normPlate(ev.plate) === plate ? { ...ev, status: "allowed" } : ev
-        ),
+        )
       }));
 
       haptic("notify", "success");
@@ -128,15 +100,12 @@ export default function App() {
     }
   }
 
-  const left =
-    view.name === "employee" ? (
-      <button className="btn ghost" onClick={onBack}>
-        ←
-      </button>
-    ) : null;
+  const left = (view.name === "employee")
+    ? <button className="btn ghost" onClick={onBack}>←</button>
+    : null;
 
   const right = null;
-
+  
   return (
     <div className="app">
       <Header title={title} subtitle={subtitle} left={left} right={right} />
@@ -151,11 +120,7 @@ export default function App() {
       ) : (
         <>
           {tab === "employees" ? (
-            <Employees
-              state={state}
-              setState={setState}
-              goEmployee={goEmployee}
-            />
+            <Employees state={state} setState={setState} goEmployee={goEmployee} />
           ) : null}
 
           {tab === "guests" ? (
