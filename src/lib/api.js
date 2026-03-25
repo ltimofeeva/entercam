@@ -13,32 +13,36 @@ import { api } from "./lib/api.js";
 export default function App() {
   const [state, setState] = useState(() => ({
     ...loadState(),
-    guests: []
+    guests: [],
   }));
 
   const [tab, setTab] = useState("employees"); // employees | guests | gate
   const [view, setView] = useState({ name: "tab", employeeId: null });
 
-  useEffect(() => initTg(), []);
-  useEffect(() => saveState(state), [state]);
+  useEffect(() => {
+    initTg();
+  }, []);
+
+  useEffect(() => {
+    saveState(state);
+  }, [state]);
 
   useEffect(() => {
     if (tab !== "guests") return;
 
-    // очищаем старые гостевые машины перед загрузкой новых
     setState((s) => ({
       ...s,
-      guests: []
+      guests: [],
     }));
 
     fetch("https://n8n.lpaderina.ru/webhook-test/guest_get", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        currentUser: state.currentUser || null
-      })
+        currentUser: state.currentUser || null,
+      }),
     })
       .then(async (res) => {
         if (!res.ok) {
@@ -51,7 +55,7 @@ export default function App() {
 
         setState((s) => ({
           ...s,
-          guests
+          guests,
         }));
       })
       .catch((err) => {
@@ -59,7 +63,7 @@ export default function App() {
 
         setState((s) => ({
           ...s,
-          guests: []
+          guests: [],
         }));
       });
   }, [tab, state.currentUser]);
@@ -76,12 +80,12 @@ export default function App() {
     if (tab === "employees" && state.currentUser) {
       return {
         fio: state.currentUser.fio,
-        department: state.currentUser.department
+        department: state.currentUser.department,
       };
     }
 
     if (view.name === "employee") {
-      const e = state.employees.find((x) => x.id === view.employeeId);
+      const e = (state.employees || []).find((x) => x.id === view.employeeId);
       return e?.phone ? { single: e.phone } : null;
     }
 
@@ -98,16 +102,20 @@ export default function App() {
 
   async function allowExit(plateRaw) {
     const plate = normPlate(plateRaw);
+
     try {
       haptic("impact", "medium");
+
       const res = await api.allowExitByPlate(plate);
-      if (!res.ok) throw new Error("API error");
+      if (!res.ok) {
+        throw new Error("API error");
+      }
 
       setState((s) => ({
         ...s,
         gateFeed: (s.gateFeed ?? []).map((ev) =>
           normPlate(ev.plate) === plate ? { ...ev, status: "allowed" } : ev
-        )
+        ),
       }));
 
       haptic("notify", "success");
@@ -118,10 +126,7 @@ export default function App() {
     }
   }
 
-  const left =
-    view.name === "employee" ? (
-    ) : null;
-
+  const left = null;
   const right = null;
 
   return (
@@ -138,7 +143,11 @@ export default function App() {
       ) : (
         <>
           {tab === "employees" ? (
-            <Employees state={state} setState={setState} goEmployee={goEmployee} />
+            <Employees
+              state={state}
+              setState={setState}
+              goEmployee={goEmployee}
+            />
           ) : null}
 
           {tab === "guests" ? (
