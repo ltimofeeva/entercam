@@ -1,32 +1,35 @@
-async function request(url, options = {}) {
-  const res = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-    ...options,
-  });
+const N8N_EMPLOYEE_WEBHOOK = "https://n8n.lpaderina.ru/webhook/employee";
 
-  let data = null;
-
+async function safeJson(res) {
+  const text = await res.text().catch(() => "");
   try {
-    data = await res.json();
+    return text ? JSON.parse(text) : null;
   } catch {
-    data = null;
+    return { _nonJson: true, _text: text };
   }
-
-  return {
-    ok: res.ok,
-    status: res.status,
-    data,
-  };
 }
 
 export const api = {
-  async allowExitByPlate(plate) {
-    return request("https://n8n.lpaderina.ru/webhook-test/allow_exit", {
+  // Проверка регистрации + получение сотрудников отдела
+  async employeeCheck(payload) {
+    const res = await fetch(N8N_EMPLOYEE_WEBHOOK, {
       method: "POST",
-      body: JSON.stringify({ plate }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
     });
+
+    const data = await safeJson(res);
+
+    if (!res.ok) {
+      const err = new Error(`employeeCheck HTTP ${res.status}`);
+      err.data = data;
+      throw err;
+    }
+
+    return data;
+  },
+
+  async allowExitByPlate(plate) {
+    return { ok: true, plate };
   },
 };
