@@ -31,22 +31,35 @@ function normalizeGuests(input) {
   return [];
 }
 
+function getTodayDate() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function createEmptyForm() {
+  const today = getTodayDate();
+
+  return {
+    fio: "",
+    plate: "",
+    entryDate: today,
+    entryTime: "08:00",
+    exitDate: today,
+    exitTime: "21:00",
+  };
+}
+
 export default function Guests({ state, setState, allowExit }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [showDateTimeFields, setShowDateTimeFields] = useState(false);
 
-  const emptyForm = {
-    fio: "",
-    plate: "",
-    entryDate: "",
-    entryTime: "",
-    exitDate: "",
-    exitTime: "",
-  };
-
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(createEmptyForm());
 
   const guestsArray = normalizeGuests(state?.guests);
 
@@ -54,11 +67,12 @@ export default function Guests({ state, setState, allowExit }) {
     const qq = normPlate(q);
     if (!qq) return guestsArray;
     return guestsArray.filter((g) => normPlate(g?.plate || "").includes(qq));
-  }, [q, state?.guests]);
+  }, [q, guestsArray]);
 
   const resetForm = () => {
-    setForm(emptyForm);
+    setForm(createEmptyForm());
     setEditingId(null);
+    setShowDateTimeFields(false);
   };
 
   const openAddModal = () => {
@@ -67,15 +81,20 @@ export default function Guests({ state, setState, allowExit }) {
   };
 
   const openEditModal = (guest) => {
+    const hasDateTime =
+      guest.entryDate || guest.entryTime || guest.exitDate || guest.exitTime;
+
     setForm({
       fio: guest.fio || guest.name || "",
       plate: guest.plate || "",
-      entryDate: guest.entryDate || "",
-      entryTime: guest.entryTime || "",
-      exitDate: guest.exitDate || "",
-      exitTime: guest.exitTime || "",
+      entryDate: guest.entryDate || getTodayDate(),
+      entryTime: guest.entryTime || "08:00",
+      exitDate: guest.exitDate || getTodayDate(),
+      exitTime: guest.exitTime || "21:00",
     });
+
     setEditingId(guest.id);
+    setShowDateTimeFields(Boolean(hasDateTime));
     setOpen(true);
   };
 
@@ -88,10 +107,10 @@ export default function Guests({ state, setState, allowExit }) {
     const payload = {
       fio,
       plate,
-      entryDate: form.entryDate,
-      entryTime: form.entryTime,
-      exitDate: form.exitDate,
-      exitTime: form.exitTime,
+      entryDate: showDateTimeFields ? form.entryDate : "",
+      entryTime: showDateTimeFields ? form.entryTime : "",
+      exitDate: showDateTimeFields ? form.exitDate : "",
+      exitTime: showDateTimeFields ? form.exitTime : "",
       type: "car_number",
     };
 
@@ -187,9 +206,6 @@ export default function Guests({ state, setState, allowExit }) {
       };
     });
   };
-
-  console.log("state.guests =", state?.guests);
-  console.log("guestsArray =", guestsArray);
 
   return (
     <div className="content">
@@ -292,45 +308,66 @@ export default function Guests({ state, setState, allowExit }) {
             onChange={(e) => setForm({ ...form, plate: e.target.value })}
           />
 
-          <div className="col" style={{ gap: 6 }}>
-            <div className="muted" style={{ fontWeight: 800 }}>Дата заезда</div>
-            <input
-              className="input"
-              type="date"
-              value={form.entryDate}
-              onChange={(e) => setForm({ ...form, entryDate: e.target.value })}
-            />
-          </div>
+          {!showDateTimeFields ? (
+            <button
+              type="button"
+              onClick={() => setShowDateTimeFields(true)}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                marginTop: 4,
+                color: "#2563eb",
+                fontWeight: 600,
+                textAlign: "left",
+                cursor: "pointer",
+              }}
+            >
+              + Добавить время въезда/выезда
+            </button>
+          ) : (
+            <div className="col" style={{ gap: 10 }}>
+              <div className="col" style={{ gap: 6 }}>
+                <div className="muted" style={{ fontWeight: 800 }}>Дата въезда</div>
+                <input
+                  className="input"
+                  type="date"
+                  value={form.entryDate}
+                  onChange={(e) => setForm({ ...form, entryDate: e.target.value })}
+                />
+              </div>
 
-          <div className="col" style={{ gap: 6 }}>
-            <div className="muted" style={{ fontWeight: 800 }}>Время заезда</div>
-            <input
-              className="input"
-              type="time"
-              value={form.entryTime}
-              onChange={(e) => setForm({ ...form, entryTime: e.target.value })}
-            />
-          </div>
+              <div className="col" style={{ gap: 6 }}>
+                <div className="muted" style={{ fontWeight: 800 }}>Время въезда</div>
+                <input
+                  className="input"
+                  type="time"
+                  value={form.entryTime}
+                  onChange={(e) => setForm({ ...form, entryTime: e.target.value })}
+                />
+              </div>
 
-          <div className="col" style={{ gap: 6 }}>
-            <div className="muted" style={{ fontWeight: 800 }}>Дата выезда</div>
-            <input
-              className="input"
-              type="date"
-              value={form.exitDate}
-              onChange={(e) => setForm({ ...form, exitDate: e.target.value })}
-            />
-          </div>
+              <div className="col" style={{ gap: 6 }}>
+                <div className="muted" style={{ fontWeight: 800 }}>Дата выезда</div>
+                <input
+                  className="input"
+                  type="date"
+                  value={form.exitDate}
+                  onChange={(e) => setForm({ ...form, exitDate: e.target.value })}
+                />
+              </div>
 
-          <div className="col" style={{ gap: 6 }}>
-            <div className="muted" style={{ fontWeight: 800 }}>Время выезда</div>
-            <input
-              className="input"
-              type="time"
-              value={form.exitTime}
-              onChange={(e) => setForm({ ...form, exitTime: e.target.value })}
-            />
-          </div>
+              <div className="col" style={{ gap: 6 }}>
+                <div className="muted" style={{ fontWeight: 800 }}>Время выезда</div>
+                <input
+                  className="input"
+                  type="time"
+                  value={form.exitTime}
+                  onChange={(e) => setForm({ ...form, exitTime: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
     </div>
