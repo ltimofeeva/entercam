@@ -4,7 +4,6 @@ import BottomNav from "./components/BottomNav.jsx";
 import Employees from "./screens/Employees.jsx";
 import EmployeeDetail from "./screens/EmployeeDetail.jsx";
 import Guests from "./screens/Guests.jsx";
-import Gate from "./screens/Gate.jsx";
 import { initTg, haptic, showAlert } from "./lib/tg.js";
 import { loadState, saveState } from "./lib/storage.js";
 import { normPlate } from "./lib/utils.js";
@@ -13,11 +12,6 @@ import { api } from "./lib/api.js";
 function normalizeGuestResponse(raw) {
   if (!raw) return [];
 
-  // Новый формат:
-  // [
-  //   { guests: [ ... ] },
-  //   { guests: [ ... ] }
-  // ]
   if (Array.isArray(raw)) {
     return raw.flatMap((item) =>
       Array.isArray(item?.guests)
@@ -36,8 +30,6 @@ function normalizeGuestResponse(raw) {
     );
   }
 
-  // Запасной вариант:
-  // { guests: [ ... ] }
   if (Array.isArray(raw?.guests)) {
     return raw.guests.map((guest) => ({
       id: guest.id || crypto.randomUUID(),
@@ -61,7 +53,7 @@ export default function App() {
     guests: loadState()?.guests || [],
   }));
 
-  const [tab, setTab] = useState("employees"); // employees | guests | gate
+  const [tab, setTab] = useState("employees"); // employees | guests
   const [view, setView] = useState({ name: "tab", employeeId: null });
   const [guestsLoading, setGuestsLoading] = useState(false);
 
@@ -114,7 +106,6 @@ export default function App() {
     if (view.name === "employee") return "Сотрудник";
     if (tab === "employees") return "Сотрудники";
     if (tab === "guests") return "Гости";
-    if (tab === "gate") return "Шлагбаум";
     return "Мини-приложение";
   }, [tab, view.name]);
 
@@ -149,13 +140,6 @@ export default function App() {
       const res = await api.allowExitByPlate(plate);
       if (!res.ok) throw new Error("API error");
 
-      setState((s) => ({
-        ...s,
-        gateFeed: (s.gateFeed ?? []).map((ev) =>
-          normPlate(ev.plate) === plate ? { ...ev, status: "allowed" } : ev
-        ),
-      }));
-
       haptic("notify", "success");
       showAlert(`Выезд разрешён: ${plate}`);
     } catch (e) {
@@ -169,11 +153,9 @@ export default function App() {
       <button className="btn ghost" onClick={onBack}>←</button>
     ) : null;
 
-  const right = null;
-
   return (
     <div className="app">
-      <Header title={title} subtitle={subtitle} left={left} right={right} />
+      <Header title={title} subtitle={subtitle} left={left} />
 
       {view.name === "employee" ? (
         <EmployeeDetail
@@ -201,10 +183,6 @@ export default function App() {
             ) : (
               <Guests state={state} setState={setState} allowExit={allowExit} />
             )
-          ) : null}
-
-          {tab === "gate" ? (
-            <Gate state={state} allowExit={allowExit} />
           ) : null}
         </>
       )}
