@@ -8,21 +8,23 @@ import { normPlate, uid } from "../lib/utils.js";
 function normalizeGuests(input) {
   if (!input) return [];
 
-  // Формат:
-  // [
-  //   { guests: [ ... ] },
-  //   { guests: [ ... ] }
-  // ]
-  if (Array.isArray(input)) {
-    return input.flatMap((item) => {
-      if (Array.isArray(item?.guests)) return item.guests;
-      return [];
-    });
+  // Уже нормальный массив гостей
+  if (Array.isArray(input) && input.length > 0 && input[0]?.plate) {
+    return input;
   }
 
-  // Формат:
-  // { guests: [ ... ] }
-  if (Array.isArray(input.guests)) {
+  // Формат: [{ guests: [...] }, { guests: [...] }]
+  if (Array.isArray(input)) {
+    return input.reduce((acc, item) => {
+      if (Array.isArray(item?.guests)) {
+        return acc.concat(item.guests);
+      }
+      return acc;
+    }, []);
+  }
+
+  // Формат: { guests: [...] }
+  if (Array.isArray(input?.guests)) {
     return input.guests;
   }
 
@@ -46,13 +48,13 @@ export default function Guests({ state, setState, allowExit }) {
 
   const [form, setForm] = useState(emptyForm);
 
-  const guestsArray = useMemo(() => normalizeGuests(state.guests), [state.guests]);
+  const guestsArray = normalizeGuests(state?.guests);
 
   const list = useMemo(() => {
     const qq = normPlate(q);
     if (!qq) return guestsArray;
-    return guestsArray.filter((g) => normPlate(g.plate || "").includes(qq));
-  }, [q, guestsArray]);
+    return guestsArray.filter((g) => normPlate(g?.plate || "").includes(qq));
+  }, [q, state?.guests]);
 
   const resetForm = () => {
     setForm(emptyForm);
@@ -98,7 +100,7 @@ export default function Guests({ state, setState, allowExit }) {
 
       if (editingId) {
         setState((s) => {
-          const currentGuests = normalizeGuests(s.guests);
+          const currentGuests = normalizeGuests(s?.guests);
 
           return {
             ...s,
@@ -156,7 +158,7 @@ export default function Guests({ state, setState, allowExit }) {
         }
 
         setState((s) => {
-          const currentGuests = normalizeGuests(s.guests);
+          const currentGuests = normalizeGuests(s?.guests);
 
           return {
             ...s,
@@ -177,7 +179,7 @@ export default function Guests({ state, setState, allowExit }) {
 
   const deleteGuest = (id) => {
     setState((s) => {
-      const currentGuests = normalizeGuests(s.guests);
+      const currentGuests = normalizeGuests(s?.guests);
 
       return {
         ...s,
@@ -185,6 +187,9 @@ export default function Guests({ state, setState, allowExit }) {
       };
     });
   };
+
+  console.log("state.guests =", state?.guests);
+  console.log("guestsArray =", guestsArray);
 
   return (
     <div className="content">
