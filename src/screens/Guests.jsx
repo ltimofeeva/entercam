@@ -36,6 +36,13 @@ function getTodayDate() {
   return `${year}-${month}-${day}`;
 }
 
+function getCurrentTime() {
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
 function formatDateDisplay(dateStr) {
   if (!dateStr) return "";
   const [year, month, day] = dateStr.split("-");
@@ -275,14 +282,17 @@ export default function Guests({ state, setState }) {
     try {
       setSaving(true);
 
+      const currentDate = getTodayDate();
+      const currentTime = getCurrentTime();
+
       const preparedGuest = {
         id: guest.id,
         fio: guest.fio || guest.name || "",
         plate: guest.plate || "",
         entryDate: guest.entryDate || "",
         entryTime: guest.entryTime || "",
-        exitDate: guest.exitDate || "",
-        exitTime: guest.exitTime || "",
+        exitDate: currentDate,
+        exitTime: currentTime,
         type: guest.type || "car_number",
       };
 
