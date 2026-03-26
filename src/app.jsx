@@ -11,17 +11,48 @@ import { normPlate } from "./lib/utils.js";
 import { api } from "./lib/api.js";
 
 function normalizeGuestResponse(raw) {
-  const root = Array.isArray(raw) ? raw[0] : raw;
-  const items = Array.isArray(root?.data) ? root.data : [];
+  if (!raw) return [];
 
-  return items.map((item) => ({
-    id: item.uid || crypto.randomUUID(),
-    plate: item.identifier || "",
-    entryDate: item.entryDate || "",
-    exitDate: item.exitDate || "",
-    name: item.name || "",
-    type: item.type || "",
-  }));
+  // Новый формат:
+  // [
+  //   { guests: [ ... ] },
+  //   { guests: [ ... ] }
+  // ]
+  if (Array.isArray(raw)) {
+    return raw.flatMap((item) =>
+      Array.isArray(item?.guests)
+        ? item.guests.map((guest) => ({
+            id: guest.id || crypto.randomUUID(),
+            fio: guest.fio || guest.name || "",
+            name: guest.fio || guest.name || "",
+            plate: guest.plate || "",
+            entryDate: guest.entryDate || "",
+            entryTime: guest.entryTime || "",
+            exitDate: guest.exitDate || "",
+            exitTime: guest.exitTime || "",
+            type: guest.type || "car_number",
+          }))
+        : []
+    );
+  }
+
+  // Запасной вариант:
+  // { guests: [ ... ] }
+  if (Array.isArray(raw?.guests)) {
+    return raw.guests.map((guest) => ({
+      id: guest.id || crypto.randomUUID(),
+      fio: guest.fio || guest.name || "",
+      name: guest.fio || guest.name || "",
+      plate: guest.plate || "",
+      entryDate: guest.entryDate || "",
+      entryTime: guest.entryTime || "",
+      exitDate: guest.exitDate || "",
+      exitTime: guest.exitTime || "",
+      type: guest.type || "car_number",
+    }));
+  }
+
+  return [];
 }
 
 export default function App() {
@@ -62,6 +93,7 @@ export default function App() {
         console.log("Guests webhook response:", data);
 
         const guests = normalizeGuestResponse(data);
+        console.log("Normalized guests:", guests);
 
         setState((s) => ({
           ...s,
