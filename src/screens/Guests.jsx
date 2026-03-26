@@ -152,7 +152,7 @@ export default function Guests({ state, setState }) {
           type: payload.type,
         };
 
-        const res = await fetch("https://n8n.lpaderina.ru/webhook-test/guest_change", {
+        const res = await fetch("https://n8n.lpaderina.ru/webhook/guest_change", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -201,7 +201,7 @@ export default function Guests({ state, setState }) {
           type: payload.type,
         };
 
-        const res = await fetch("https://n8n.lpaderina.ru/webhook-test/guest_add", {
+        const res = await fetch("https://n8n.lpaderina.ru/webhook/guest_add", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -239,7 +239,7 @@ export default function Guests({ state, setState }) {
     try {
       setSaving(true);
 
-      const res = await fetch("https://n8n.lpaderina.ru/webhook-test/guest_delete", {
+      const res = await fetch("https://n8n.lpaderina.ru/webhook/guest_delete", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -296,7 +296,7 @@ export default function Guests({ state, setState }) {
         type: guest.type || "car_number",
       };
 
-      const res = await fetch("https://n8n.lpaderina.ru/webhook-test/guest_allow", {
+      const res = await fetch("https://n8n.lpaderina.ru/webhook/guest_allow", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
