@@ -18,6 +18,9 @@ const ADD_EMPLOYEE_CAR_WEBHOOK =
 const DELETE_EMPLOYEE_CAR_WEBHOOK =
   "https://n8n.lpaderina.ru/webhook/delete_employee_car";
 
+const CHANGE_EMPLOYEE_WEBHOOK =
+  "https://n8n.lpaderina.ru/webhook/change_employee";
+
 function normalizeCarsResponse(raw) {
   const root = Array.isArray(raw) ? raw[0] : raw;
   const data = Array.isArray(root?.cars)
@@ -58,13 +61,34 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
   );
 
   const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [plate, setPlate] = useState("");
+  const [editForm, setEditForm] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    dept: "",
+  });
+
   const [confirm, setConfirm] = useState({ open: false, carId: null, carPlate: "" });
   const [confirmEmp, setConfirmEmp] = useState(false);
+
   const [deletingEmployee, setDeletingEmployee] = useState(false);
   const [carsLoading, setCarsLoading] = useState(false);
   const [addingCar, setAddingCar] = useState(false);
+  const [savingEmployee, setSavingEmployee] = useState(false);
   const [deletingCarId, setDeletingCarId] = useState(null);
+
+  useEffect(() => {
+    if (!emp) return;
+
+    setEditForm({
+      name: emp.name ?? "",
+      phone: emp.phone ?? "",
+      email: emp.email ?? "",
+      dept: emp.dept ?? "",
+    });
+  }, [emp]);
 
   useEffect(() => {
     let cancelled = false;
@@ -221,6 +245,82 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
     }
   };
 
+  const saveEmployee = async () => {
+    if (savingEmployee) return;
+
+    const nextEmployee = {
+      id: emp.id,
+      name: (editForm.name ?? "").trim(),
+      phone: (editForm.phone ?? "").trim(),
+      email: (editForm.email ?? "").trim(),
+      dept: (editForm.dept ?? "").trim(),
+    };
+
+    if (!nextEmployee.name) {
+      alert("Укажите имя сотрудника.");
+      return;
+    }
+
+    const ctx = getTgContext();
+    const userId = ctx?.user_id ?? null;
+
+    const payload = {
+      event: "change_employee",
+      ts: new Date().toISOString(),
+      user_id: userId,
+      current_user: state.currentUser ?? null,
+      employee_before: {
+        id: emp.id,
+        name: emp.name ?? "",
+        phone: emp.phone ?? "",
+        email: emp.email ?? "",
+        dept: emp.dept ?? "",
+      },
+      employee: {
+        ...nextEmployee,
+        cars: Array.isArray(emp.cars) ? emp.cars : [],
+      },
+    };
+
+    try {
+      setSavingEmployee(true);
+
+      const res = await fetch(CHANGE_EMPLOYEE_WEBHOOK, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Webhook error: ${res.status}`);
+      }
+
+      setState((s) => ({
+        ...s,
+        employees: (s.employees || []).map((e) =>
+          e.id === emp.id
+            ? {
+                ...e,
+                name: nextEmployee.name,
+                phone: nextEmployee.phone,
+                email: nextEmployee.email,
+                dept: nextEmployee.dept,
+              }
+            : e
+        ),
+      }));
+
+      setEditOpen(false);
+    } catch (e) {
+      console.error("saveEmployee error:", e);
+      alert("Не удалось сохранить данные сотрудника. Проверьте вебхук или сеть.");
+    } finally {
+      setSavingEmployee(false);
+    }
+  };
+
   const deleteCar = async (carId) => {
     if (!carId || deletingCarId) return;
 
@@ -343,6 +443,15 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
               {[emp.dept, emp.email].filter(Boolean).join(" • ")}
             </div>
           ) : null}
+
+          <div style={{ marginTop: 12 }}>
+            <button
+              className="btn"
+              onClick={() => setEditOpen(true)}
+            >
+              Изменить данные о сотруднике
+            </button>
+          </div>
         </div>
       </Card>
 
@@ -383,6 +492,63 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
       <button className="btn danger" onClick={() => setConfirmEmp(true)}>
         Удалить сотрудника
       </button>
+
+      <Modal
+        open={editOpen}
+        title="Изменить данные сотрудника"
+        onClose={() => !savingEmployee && setEditOpen(false)}
+        actions={
+          <>
+            <button
+              className="btn"
+              onClick={() => setEditOpen(false)}
+              disabled={savingEmployee}
+            >
+              Отмена
+            </button>
+            <button
+              className="btn primary"
+              onClick={saveEmployee}
+              disabled={!editForm.name.trim() || savingEmployee}
+            >
+              {savingEmployee ? "Сохраняем..." : "Сохранить"}
+            </button>
+          </>
+        }
+      >
+        <Input
+          label="ФИО*"
+          placeholder="Введите ФИО"
+          value={editForm.name}
+          onChange={(e) =>
+            setEditForm((f) => ({ ...f, name: e.target.value }))
+          }
+        />
+        <Input
+          label="Телефон"
+          placeholder="+7..."
+          value={editForm.phone}
+          onChange={(e) =>
+            setEditForm((f) => ({ ...f, phone: e.target.value }))
+          }
+        />
+        <Input
+          label="Email"
+          placeholder="example@mail.ru"
+          value={editForm.email}
+          onChange={(e) =>
+            setEditForm((f) => ({ ...f, email: e.target.value }))
+          }
+        />
+        <Input
+          label="Отдел"
+          placeholder="Введите отдел"
+          value={editForm.dept}
+          onChange={(e) =>
+            setEditForm((f) => ({ ...f, dept: e.target.value }))
+          }
+        />
+      </Modal>
 
       <Modal
         open={addOpen}
