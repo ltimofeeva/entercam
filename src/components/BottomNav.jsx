@@ -2,8 +2,7 @@ import React from "react";
 
 const tabs = [
   { key: "employees", label: "Сотрудники", icon: "👤" },
-  { key: "guests", label: "Гости", icon: "🚗" },
-  { key: "gate", label: "Шлагбаум", icon: "📍" }
+  { key: "guests", label: "Гости", icon: "🚗" }
 ];
 
 export default function BottomNav({ active, onChange }) {
