@@ -67,7 +67,7 @@ export default function App() {
       try {
         setGuestsLoading(true);
 
-        const res = await fetch("https://n8n.lpaderina.ru/webhook-test/guest_get", {
+        const res = await fetch("https://n8n.lpaderina.ru/webhook/guest_get", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
