@@ -39,6 +39,13 @@ function getTodayDate() {
   return `${year}-${month}-${day}`;
 }
 
+function formatDateDisplay(dateStr) {
+  if (!dateStr) return "";
+  const [year, month, day] = dateStr.split("-");
+  if (!year || !month || !day) return dateStr;
+  return `${day}.${month}.${year}`;
+}
+
 function createEmptyForm() {
   const today = getTodayDate();
 
@@ -239,9 +246,20 @@ export default function Guests({ state, setState, allowExit }) {
                 <div className="muted">ФИО: {g.fio || g.name}</div>
               ) : null}
 
-              {g.entryDate ? <div className="muted">Дата заезда: {g.entryDate}</div> : null}
+              {g.entryDate ? (
+                <div className="muted">
+                  Дата заезда: {formatDateDisplay(g.entryDate)}
+                </div>
+              ) : null}
+
               {g.entryTime ? <div className="muted">Время заезда: {g.entryTime}</div> : null}
-              {g.exitDate ? <div className="muted">Дата выезда: {g.exitDate}</div> : null}
+
+              {g.exitDate ? (
+                <div className="muted">
+                  Дата выезда: {formatDateDisplay(g.exitDate)}
+                </div>
+              ) : null}
+
               {g.exitTime ? <div className="muted">Время выезда: {g.exitTime}</div> : null}
 
               <div className="row" style={{ marginTop: 10, gap: 8, flexWrap: "wrap" }}>
