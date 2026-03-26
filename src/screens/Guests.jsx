@@ -5,6 +5,21 @@ import Modal from "../components/Modal.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import { normPlate, uid } from "../lib/utils.js";
 
+function normalizeGuests(input) {
+  if (Array.isArray(input)) {
+    if (input.length > 0 && Array.isArray(input[0]?.guests)) {
+      return input[0].guests;
+    }
+    return input;
+  }
+
+  if (input && Array.isArray(input.guests)) {
+    return input.guests;
+  }
+
+  return [];
+}
+
 export default function Guests({ state, setState, allowExit }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
@@ -22,11 +37,13 @@ export default function Guests({ state, setState, allowExit }) {
 
   const [form, setForm] = useState(emptyForm);
 
+  const guestsArray = useMemo(() => normalizeGuests(state.guests), [state.guests]);
+
   const list = useMemo(() => {
     const qq = normPlate(q);
-    if (!qq) return state.guests || [];
-    return (state.guests || []).filter((g) => normPlate(g.plate).includes(qq));
-  }, [q, state.guests]);
+    if (!qq) return guestsArray;
+    return guestsArray.filter((g) => normPlate(g.plate || "").includes(qq));
+  }, [q, guestsArray]);
 
   const resetForm = () => {
     setForm(emptyForm);
@@ -71,24 +88,28 @@ export default function Guests({ state, setState, allowExit }) {
       setSaving(true);
 
       if (editingId) {
-        setState((s) => ({
-          ...s,
-          guests: (s.guests || []).map((g) =>
-            g.id === editingId
-              ? {
-                  ...g,
-                  fio: payload.fio,
-                  name: payload.fio,
-                  plate: payload.plate,
-                  entryDate: payload.entryDate,
-                  entryTime: payload.entryTime,
-                  exitDate: payload.exitDate,
-                  exitTime: payload.exitTime,
-                  type: payload.type,
-                }
-              : g
-          ),
-        }));
+        setState((s) => {
+          const currentGuests = normalizeGuests(s.guests);
+
+          return {
+            ...s,
+            guests: currentGuests.map((g) =>
+              g.id === editingId
+                ? {
+                    ...g,
+                    fio: payload.fio,
+                    name: payload.fio,
+                    plate: payload.plate,
+                    entryDate: payload.entryDate,
+                    entryTime: payload.entryTime,
+                    exitDate: payload.exitDate,
+                    exitTime: payload.exitTime,
+                    type: payload.type,
+                  }
+                : g
+            ),
+          };
+        });
       } else {
         const next = {
           id: uid(),
@@ -125,10 +146,14 @@ export default function Guests({ state, setState, allowExit }) {
           throw new Error(`Ошибка webhook: ${res.status}`);
         }
 
-        setState((s) => ({
-          ...s,
-          guests: [next, ...(s.guests || [])],
-        }));
+        setState((s) => {
+          const currentGuests = normalizeGuests(s.guests);
+
+          return {
+            ...s,
+            guests: [next, ...currentGuests],
+          };
+        });
       }
 
       resetForm();
@@ -142,10 +167,14 @@ export default function Guests({ state, setState, allowExit }) {
   };
 
   const deleteGuest = (id) => {
-    setState((s) => ({
-      ...s,
-      guests: (s.guests || []).filter((g) => g.id !== id),
-    }));
+    setState((s) => {
+      const currentGuests = normalizeGuests(s.guests);
+
+      return {
+        ...s,
+        guests: currentGuests.filter((g) => g.id !== id),
+      };
+    });
   };
 
   return (
@@ -156,7 +185,7 @@ export default function Guests({ state, setState, allowExit }) {
         onChange={(e) => setQ(e.target.value)}
       />
 
-      {(state.guests || []).length === 0 ? (
+      {guestsArray.length === 0 ? (
         <EmptyState
           title="Гостевых машин нет"
           hint="Добавьте первую гостевую машину."
