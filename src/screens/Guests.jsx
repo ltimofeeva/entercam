@@ -8,12 +8,10 @@ import { normPlate, uid } from "../lib/utils.js";
 function normalizeGuests(input) {
   if (!input) return [];
 
-  // Уже нормальный массив гостей
   if (Array.isArray(input) && input.length > 0 && input[0]?.plate) {
     return input;
   }
 
-  // Формат: [{ guests: [...] }, { guests: [...] }]
   if (Array.isArray(input)) {
     return input.reduce((acc, item) => {
       if (Array.isArray(item?.guests)) {
@@ -23,7 +21,6 @@ function normalizeGuests(input) {
     }, []);
   }
 
-  // Формат: { guests: [...] }
   if (Array.isArray(input?.guests)) {
     return input.guests;
   }
@@ -59,7 +56,7 @@ function createEmptyForm() {
   };
 }
 
-export default function Guests({ state, setState, allowExit }) {
+export default function Guests({ state, setState }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -105,6 +102,17 @@ export default function Guests({ state, setState, allowExit }) {
     setOpen(true);
   };
 
+  const buildGuestPayload = (guest) => ({
+    id: guest.id,
+    fio: guest.fio,
+    plate: guest.plate,
+    entryDate: guest.entryDate || "",
+    entryTime: guest.entryTime || "",
+    exitDate: guest.exitDate || "",
+    exitTime: guest.exitTime || "",
+    type: guest.type || "car_number",
+  });
+
   const saveGuest = async () => {
     const plate = normPlate(form.plate);
     const fio = (form.fio || "").trim();
@@ -125,6 +133,32 @@ export default function Guests({ state, setState, allowExit }) {
       setSaving(true);
 
       if (editingId) {
+        const updatedGuest = {
+          id: editingId,
+          fio: payload.fio,
+          name: payload.fio,
+          plate: payload.plate,
+          entryDate: payload.entryDate,
+          entryTime: payload.entryTime,
+          exitDate: payload.exitDate,
+          exitTime: payload.exitTime,
+          type: payload.type,
+        };
+
+        const res = await fetch("https://n8n.lpaderina.ru/webhook-test/guest_change", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            guest: buildGuestPayload(updatedGuest),
+          }),
+        });
+
+        if (!res.ok) {
+          throw new Error(`Ошибка webhook guest_change: ${res.status}`);
+        }
+
         setState((s) => {
           const currentGuests = normalizeGuests(s?.guests);
 
@@ -134,14 +168,14 @@ export default function Guests({ state, setState, allowExit }) {
               g.id === editingId
                 ? {
                     ...g,
-                    fio: payload.fio,
-                    name: payload.fio,
-                    plate: payload.plate,
-                    entryDate: payload.entryDate,
-                    entryTime: payload.entryTime,
-                    exitDate: payload.exitDate,
-                    exitTime: payload.exitTime,
-                    type: payload.type,
+                    fio: updatedGuest.fio,
+                    name: updatedGuest.name,
+                    plate: updatedGuest.plate,
+                    entryDate: updatedGuest.entryDate,
+                    entryTime: updatedGuest.entryTime,
+                    exitDate: updatedGuest.exitDate,
+                    exitTime: updatedGuest.exitTime,
+                    type: updatedGuest.type,
                   }
                 : g
             ),
@@ -166,21 +200,12 @@ export default function Guests({ state, setState, allowExit }) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            guest: {
-              id: next.id,
-              fio: next.fio,
-              plate: next.plate,
-              entryDate: next.entryDate,
-              entryTime: next.entryTime,
-              exitDate: next.exitDate,
-              exitTime: next.exitTime,
-              type: next.type,
-            },
+            guest: buildGuestPayload(next),
           }),
         });
 
         if (!res.ok) {
-          throw new Error(`Ошибка webhook: ${res.status}`);
+          throw new Error(`Ошибка webhook guest_add: ${res.status}`);
         }
 
         setState((s) => {
@@ -203,15 +228,85 @@ export default function Guests({ state, setState, allowExit }) {
     }
   };
 
-  const deleteGuest = (id) => {
-    setState((s) => {
-      const currentGuests = normalizeGuests(s?.guests);
+  const deleteGuest = async (guest) => {
+    try {
+      setSaving(true);
 
-      return {
-        ...s,
-        guests: currentGuests.filter((g) => g.id !== id),
+      const res = await fetch("https://n8n.lpaderina.ru/webhook-test/guest_delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          guest: buildGuestPayload({
+            id: guest.id,
+            fio: guest.fio || guest.name || "",
+            plate: guest.plate || "",
+            entryDate: guest.entryDate || "",
+            entryTime: guest.entryTime || "",
+            exitDate: guest.exitDate || "",
+            exitTime: guest.exitTime || "",
+            type: guest.type || "car_number",
+          }),
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Ошибка webhook guest_delete: ${res.status}`);
+      }
+
+      setState((s) => {
+        const currentGuests = normalizeGuests(s?.guests);
+
+        return {
+          ...s,
+          guests: currentGuests.filter((g) => g.id !== guest.id),
+        };
+      });
+    } catch (err) {
+      console.error("guest delete error:", err);
+      alert("Не удалось удалить гостевую машину");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const allowGuestExit = async (guest) => {
+    try {
+      setSaving(true);
+
+      const preparedGuest = {
+        id: guest.id,
+        fio: guest.fio || guest.name || "",
+        plate: guest.plate || "",
+        entryDate: guest.entryDate || "",
+        entryTime: guest.entryTime || "",
+        exitDate: guest.exitDate || "",
+        exitTime: guest.exitTime || "",
+        type: guest.type || "car_number",
       };
-    });
+
+      const res = await fetch("https://n8n.lpaderina.ru/webhook-test/guest_allow", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          guest: buildGuestPayload(preparedGuest),
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Ошибка webhook guest_allow: ${res.status}`);
+      }
+
+      alert(`Выезд разрешён: ${preparedGuest.plate}`);
+    } catch (err) {
+      console.error("guest allow error:", err);
+      alert("Не удалось разрешить выезд");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -252,7 +347,9 @@ export default function Guests({ state, setState, allowExit }) {
                 </div>
               ) : null}
 
-              {g.entryTime ? <div className="muted">Время заезда: {g.entryTime}</div> : null}
+              {g.entryTime ? (
+                <div className="muted">Время заезда: {g.entryTime}</div>
+              ) : null}
 
               {g.exitDate ? (
                 <div className="muted">
@@ -260,16 +357,28 @@ export default function Guests({ state, setState, allowExit }) {
                 </div>
               ) : null}
 
-              {g.exitTime ? <div className="muted">Время выезда: {g.exitTime}</div> : null}
+              {g.exitTime ? (
+                <div className="muted">Время выезда: {g.exitTime}</div>
+              ) : null}
 
               <div className="row" style={{ marginTop: 10, gap: 8, flexWrap: "wrap" }}>
-                <button className="btn" onClick={() => openEditModal(g)}>
+                <button className="btn" onClick={() => openEditModal(g)} disabled={saving}>
                   Изменить
                 </button>
-                <button className="btn primary" onClick={() => allowExit(g.plate)}>
+
+                <button
+                  className="btn primary"
+                  onClick={() => allowGuestExit(g)}
+                  disabled={saving}
+                >
                   Разрешить выезд
                 </button>
-                <button className="btn danger" onClick={() => deleteGuest(g.id)}>
+
+                <button
+                  className="btn danger"
+                  onClick={() => deleteGuest(g)}
+                  disabled={saving}
+                >
                   Удалить
                 </button>
               </div>
@@ -278,7 +387,7 @@ export default function Guests({ state, setState, allowExit }) {
         ))}
       </div>
 
-      <button className="btn primary" onClick={openAddModal}>
+      <button className="btn primary" onClick={openAddModal} disabled={saving}>
         + Добавить гостевую машину
       </button>
 
@@ -286,6 +395,7 @@ export default function Guests({ state, setState, allowExit }) {
         open={open}
         title={editingId ? "Изменить гостевую машину" : "Добавить гостевую машину"}
         onClose={() => {
+          if (saving) return;
           setOpen(false);
           resetForm();
         }}
