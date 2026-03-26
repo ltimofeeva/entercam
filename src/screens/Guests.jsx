@@ -6,14 +6,23 @@ import EmptyState from "../components/EmptyState.jsx";
 import { normPlate, uid } from "../lib/utils.js";
 
 function normalizeGuests(input) {
+  if (!input) return [];
+
+  // Формат:
+  // [
+  //   { guests: [ ... ] },
+  //   { guests: [ ... ] }
+  // ]
   if (Array.isArray(input)) {
-    if (input.length > 0 && Array.isArray(input[0]?.guests)) {
-      return input[0].guests;
-    }
-    return input;
+    return input.flatMap((item) => {
+      if (Array.isArray(item?.guests)) return item.guests;
+      return [];
+    });
   }
 
-  if (input && Array.isArray(input.guests)) {
+  // Формат:
+  // { guests: [ ... ] }
+  if (Array.isArray(input.guests)) {
     return input.guests;
   }
 
