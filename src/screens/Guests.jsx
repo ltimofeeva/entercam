@@ -211,7 +211,7 @@ export default function Guests({ state, setState }) {
       nextErrors.plate = "Заполните поле «Номер авто»";
     } else if (!isValidCarPlate(form.plate)) {
       nextErrors.plate =
-        "Неверный формат номера авто. Пример: A444EE74";
+        "Неверный формат номера авто. Пример: Н123НН74";
     }
 
     if (!(form.entryDate || "").trim()) {
@@ -530,9 +530,6 @@ export default function Guests({ state, setState }) {
                   </div>
                 ) : null}
 
-                {g.entryTime ? (
-                  <div className="muted">Время заезда: {g.entryTime}</div>
-                ) : null}
 
                 {g.exitDate ? (
                   <div className="muted">
@@ -540,9 +537,6 @@ export default function Guests({ state, setState }) {
                   </div>
                 ) : null}
 
-                {g.exitTime ? (
-                  <div className="muted">Время выезда: {g.exitTime}</div>
-                ) : null}
 
                 <div className="row" style={{ marginTop: 10, gap: 8, flexWrap: "wrap" }}>
                   <button
@@ -626,7 +620,7 @@ export default function Guests({ state, setState }) {
           <div>
             <Input
               label="Номер авто*"
-              placeholder="Напр. A444EE74"
+              placeholder="Напр. Н123НН74"
               value={form.plate}
               onChange={(e) => {
                 setForm({ ...form, plate: e.target.value });
