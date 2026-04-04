@@ -357,6 +357,15 @@ export default function Guests({ state, setState }) {
         onChange={(e) => setQ(e.target.value)}
       />
 
+      <button
+        className="btn primary"
+        onClick={openAddModal}
+        disabled={saving}
+        style={{ width: "100%", marginTop: 12, marginBottom: 12 }}
+      >
+        + Добавить гостевую машину
+      </button>
+
       <div
         style={{
           display: "flex",
@@ -462,10 +471,6 @@ export default function Guests({ state, setState }) {
           </Card>
         ))}
       </div>
-
-      <button className="btn primary" onClick={openAddModal} disabled={saving}>
-        + Добавить гостевую машину
-      </button>
 
       <Modal
         open={open}
