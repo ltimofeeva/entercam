@@ -57,9 +57,9 @@ function createEmptyForm() {
     fio: "",
     plate: "",
     entryDate: today,
-    entryTime: "08:00",
+    entryTime: "00:00",
     exitDate: today,
-    exitTime: "21:00",
+    exitTime: "23:59",
   };
 }
 
@@ -99,9 +99,9 @@ export default function Guests({ state, setState }) {
       fio: guest.fio || guest.name || "",
       plate: guest.plate || "",
       entryDate: guest.entryDate || getTodayDate(),
-      entryTime: guest.entryTime || "08:00",
+      entryTime: guest.entryTime || "00:00",
       exitDate: guest.exitDate || getTodayDate(),
-      exitTime: guest.exitTime || "21:00",
+      exitTime: guest.exitTime || "23:59",
     });
 
     setEditingId(guest.id);
