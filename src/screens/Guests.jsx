@@ -461,27 +461,24 @@ export default function Guests({ state, setState }) {
                 cursor: "pointer",
               }}
             >
-              + Добавить время въезда/выезда
+              + Добавить даты заезда/выезда
             </button>
           ) : (
             <div className="col" style={{ gap: 10 }}>
               <div className="col" style={{ gap: 6 }}>
-                <div className="muted" style={{ fontWeight: 800 }}>Дата въезда</div>
+                <div className="muted" style={{ fontWeight: 800 }}>Дата заезда</div>
                 <input
                   className="input"
                   type="date"
                   value={form.entryDate}
-                  onChange={(e) => setForm({ ...form, entryDate: e.target.value })}
-                />
-              </div>
-
-              <div className="col" style={{ gap: 6 }}>
-                <div className="muted" style={{ fontWeight: 800 }}>Время въезда</div>
-                <input
-                  className="input"
-                  type="time"
-                  value={form.entryTime}
-                  onChange={(e) => setForm({ ...form, entryTime: e.target.value })}
+                  onChange={(e) => {
+                    const newEntryDate = e.target.value;
+                    setForm({
+                      ...form,
+                      entryDate: newEntryDate,
+                      exitDate: newEntryDate,
+                    });
+                  }}
                 />
               </div>
 
@@ -492,16 +489,6 @@ export default function Guests({ state, setState }) {
                   type="date"
                   value={form.exitDate}
                   onChange={(e) => setForm({ ...form, exitDate: e.target.value })}
-                />
-              </div>
-
-              <div className="col" style={{ gap: 6 }}>
-                <div className="muted" style={{ fontWeight: 800 }}>Время выезда</div>
-                <input
-                  className="input"
-                  type="time"
-                  value={form.exitTime}
-                  onChange={(e) => setForm({ ...form, exitTime: e.target.value })}
                 />
               </div>
             </div>
