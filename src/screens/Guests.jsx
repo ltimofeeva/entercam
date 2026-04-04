@@ -119,7 +119,6 @@ function normalizePlateForValidation(value) {
 
 function isValidCarPlate(value) {
   const normalized = normalizePlateForValidation(value);
-
   return /^[ABEKMHOPCTYX]\d{3}[ABEKMHOPCTYX]{2}\d{2,3}$/.test(normalized);
 }
 
@@ -135,6 +134,11 @@ export default function Guests({ state, setState }) {
   const [form, setForm] = useState(createEmptyForm());
 
   const guestsArray = normalizeGuests(state?.guests);
+
+  const getDepartmentData = () => ({
+    department: state?.current_user?.department || "",
+    department_id: state?.current_user?.department_id || "",
+  });
 
   const list = useMemo(() => {
     const qq = normPlate(q);
@@ -192,6 +196,8 @@ export default function Guests({ state, setState }) {
     exitDate: guest.exitDate || "",
     exitTime: guest.exitTime || "",
     type: guest.type || "car_number",
+    department: guest.department || "",
+    department_id: guest.department_id || "",
   });
 
   const validateForm = () => {
@@ -205,7 +211,7 @@ export default function Guests({ state, setState }) {
       nextErrors.plate = "Заполните поле «Номер авто»";
     } else if (!isValidCarPlate(form.plate)) {
       nextErrors.plate =
-        "Неверный формат номера авто. Пример: Н123НН74";
+        "Неверный формат номера авто. Пример: A444EE74";
     }
 
     if (!(form.entryDate || "").trim()) {
@@ -228,11 +234,11 @@ export default function Guests({ state, setState }) {
 
   const saveGuest = async () => {
     if (saving) return;
-
     if (!validateForm()) return;
 
     const plate = normPlate(normalizePlateForValidation(form.plate));
     const fio = (form.fio || "").trim();
+    const departmentData = getDepartmentData();
 
     const payload = {
       fio,
@@ -242,6 +248,7 @@ export default function Guests({ state, setState }) {
       exitDate: form.exitDate,
       exitTime: showDateTimeFields ? form.exitTime : "",
       type: "car_number",
+      ...departmentData,
     };
 
     try {
@@ -258,6 +265,8 @@ export default function Guests({ state, setState }) {
           exitDate: payload.exitDate,
           exitTime: payload.exitTime,
           type: payload.type,
+          department: payload.department,
+          department_id: payload.department_id,
         };
 
         const res = await fetch("https://n8n.lpaderina.ru/webhook/guest_change", {
@@ -291,6 +300,8 @@ export default function Guests({ state, setState }) {
                     exitDate: updatedGuest.exitDate,
                     exitTime: updatedGuest.exitTime,
                     type: updatedGuest.type,
+                    department: updatedGuest.department,
+                    department_id: updatedGuest.department_id,
                   }
                 : g
             ),
@@ -307,6 +318,8 @@ export default function Guests({ state, setState }) {
           exitDate: payload.exitDate,
           exitTime: payload.exitTime,
           type: payload.type,
+          department: payload.department,
+          department_id: payload.department_id,
         };
 
         const res = await fetch("https://n8n.lpaderina.ru/webhook/guest_add", {
@@ -362,6 +375,8 @@ export default function Guests({ state, setState }) {
             exitDate: guest.exitDate || "",
             exitTime: guest.exitTime || "",
             type: guest.type || "car_number",
+            department: guest.department || state?.current_user?.department || "",
+            department_id: guest.department_id || state?.current_user?.department_id || "",
           }),
         }),
       });
@@ -402,6 +417,8 @@ export default function Guests({ state, setState }) {
         exitDate: currentDate,
         exitTime: currentTime,
         type: guest.type || "car_number",
+        department: guest.department || state?.current_user?.department || "",
+        department_id: guest.department_id || state?.current_user?.department_id || "",
       };
 
       const res = await fetch("https://n8n.lpaderina.ru/webhook/guest_allow", {
@@ -513,6 +530,9 @@ export default function Guests({ state, setState }) {
                   </div>
                 ) : null}
 
+                {g.entryTime ? (
+                  <div className="muted">Время заезда: {g.entryTime}</div>
+                ) : null}
 
                 {g.exitDate ? (
                   <div className="muted">
@@ -520,7 +540,9 @@ export default function Guests({ state, setState }) {
                   </div>
                 ) : null}
 
-               
+                {g.exitTime ? (
+                  <div className="muted">Время выезда: {g.exitTime}</div>
+                ) : null}
 
                 <div className="row" style={{ marginTop: 10, gap: 8, flexWrap: "wrap" }}>
                   <button
@@ -604,7 +626,7 @@ export default function Guests({ state, setState }) {
           <div>
             <Input
               label="Номер авто*"
-              placeholder="Напр. Н123НН74"
+              placeholder="Напр. A444EE74"
               value={form.plate}
               onChange={(e) => {
                 setForm({ ...form, plate: e.target.value });
