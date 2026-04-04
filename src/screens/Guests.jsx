@@ -513,9 +513,6 @@ export default function Guests({ state, setState }) {
                   </div>
                 ) : null}
 
-                {g.entryTime ? (
-                  <div className="muted">Время заезда: {g.entryTime}</div>
-                ) : null}
 
                 {g.exitDate ? (
                   <div className="muted">
@@ -523,9 +520,7 @@ export default function Guests({ state, setState }) {
                   </div>
                 ) : null}
 
-                {g.exitTime ? (
-                  <div className="muted">Время выезда: {g.exitTime}</div>
-                ) : null}
+               
 
                 <div className="row" style={{ marginTop: 10, gap: 8, flexWrap: "wrap" }}>
                   <button
