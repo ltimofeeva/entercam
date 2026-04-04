@@ -79,13 +79,58 @@ function isGuestActiveByTime(guest) {
   return guestMinutes > currentMinutes;
 }
 
+function normalizePlateForValidation(value) {
+  if (!value) return "";
+
+  const map = {
+    A: "A",
+    А: "A",
+    B: "B",
+    В: "B",
+    E: "E",
+    Е: "E",
+    K: "K",
+    К: "K",
+    M: "M",
+    М: "M",
+    H: "H",
+    Н: "H",
+    O: "O",
+    О: "O",
+    P: "P",
+    Р: "P",
+    C: "C",
+    С: "C",
+    T: "T",
+    Т: "T",
+    Y: "Y",
+    У: "Y",
+    X: "X",
+    Х: "X",
+  };
+
+  return String(value)
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .split("")
+    .map((char) => map[char] || char)
+    .join("");
+}
+
+function isValidCarPlate(value) {
+  const normalized = normalizePlateForValidation(value);
+
+  return /^[ABEKMHOPCTYX]\d{3}[ABEKMHOPCTYX]{2}\d{2,3}$/.test(normalized);
+}
+
 export default function Guests({ state, setState }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [showDateTimeFields, setShowDateTimeFields] = useState(false);
+  const [showDateTimeFields, setShowDateTimeFields] = useState(true);
   const [activeTab, setActiveTab] = useState("active");
+  const [errors, setErrors] = useState({});
 
   const [form, setForm] = useState(createEmptyForm());
 
@@ -113,7 +158,8 @@ export default function Guests({ state, setState }) {
   const resetForm = () => {
     setForm(createEmptyForm());
     setEditingId(null);
-    setShowDateTimeFields(false);
+    setShowDateTimeFields(true);
+    setErrors({});
   };
 
   const openAddModal = () => {
@@ -122,9 +168,6 @@ export default function Guests({ state, setState }) {
   };
 
   const openEditModal = (guest) => {
-    const hasDateTime =
-      guest.entryDate || guest.entryTime || guest.exitDate || guest.exitTime;
-
     setForm({
       fio: guest.fio || guest.name || "",
       plate: guest.plate || "",
@@ -135,7 +178,8 @@ export default function Guests({ state, setState }) {
     });
 
     setEditingId(guest.id);
-    setShowDateTimeFields(Boolean(hasDateTime));
+    setShowDateTimeFields(true);
+    setErrors({});
     setOpen(true);
   };
 
@@ -150,18 +194,52 @@ export default function Guests({ state, setState }) {
     type: guest.type || "car_number",
   });
 
-  const saveGuest = async () => {
-    const plate = normPlate(form.plate);
-    const fio = (form.fio || "").trim();
+  const validateForm = () => {
+    const nextErrors = {};
 
-    if (!fio || !plate || saving) return;
+    if (!(form.fio || "").trim()) {
+      nextErrors.fio = "Заполните поле «ФИО»";
+    }
+
+    if (!(form.plate || "").trim()) {
+      nextErrors.plate = "Заполните поле «Номер авто»";
+    } else if (!isValidCarPlate(form.plate)) {
+      nextErrors.plate =
+        "Неверный формат номера авто. Пример: A444FF74";
+    }
+
+    if (!(form.entryDate || "").trim()) {
+      nextErrors.entryDate = "Заполните поле «Дата въезда»";
+    }
+
+    if (!(form.exitDate || "").trim()) {
+      nextErrors.exitDate = "Заполните поле «Дата выезда»";
+    }
+
+    setErrors(nextErrors);
+
+    if (Object.keys(nextErrors).length > 0) {
+      alert(Object.values(nextErrors)[0]);
+      return false;
+    }
+
+    return true;
+  };
+
+  const saveGuest = async () => {
+    if (saving) return;
+
+    if (!validateForm()) return;
+
+    const plate = normPlate(normalizePlateForValidation(form.plate));
+    const fio = (form.fio || "").trim();
 
     const payload = {
       fio,
       plate,
-      entryDate: showDateTimeFields ? form.entryDate : "",
+      entryDate: form.entryDate,
       entryTime: showDateTimeFields ? form.entryTime : "",
-      exitDate: showDateTimeFields ? form.exitDate : "",
+      exitDate: form.exitDate,
       exitTime: showDateTimeFields ? form.exitTime : "",
       type: "car_number",
     };
@@ -503,7 +581,7 @@ export default function Guests({ state, setState }) {
             <button
               className="btn primary"
               onClick={saveGuest}
-              disabled={!form.fio.trim() || !normPlate(form.plate) || saving}
+              disabled={saving}
             >
               {saving ? "Сохранение..." : "Сохранить"}
             </button>
@@ -511,41 +589,44 @@ export default function Guests({ state, setState }) {
         }
       >
         <div className="col" style={{ gap: 10 }}>
-          <Input
-            label="ФИО*"
-            placeholder="Напр. Иванов Иван Иванович"
-            value={form.fio}
-            onChange={(e) => setForm({ ...form, fio: e.target.value })}
-          />
-
-          <Input
-            label="Номер авто*"
-            placeholder="Напр. M555MM174"
-            value={form.plate}
-            onChange={(e) => setForm({ ...form, plate: e.target.value })}
-          />
-
-          {!showDateTimeFields ? (
-            <button
-              type="button"
-              onClick={() => setShowDateTimeFields(true)}
-              style={{
-                background: "none",
-                border: "none",
-                padding: 0,
-                marginTop: 4,
-                color: "#2563eb",
-                fontWeight: 600,
-                textAlign: "left",
-                cursor: "pointer",
+          <div>
+            <Input
+              label="ФИО*"
+              placeholder="Напр. Иванов Иван Иванович"
+              value={form.fio}
+              onChange={(e) => {
+                setForm({ ...form, fio: e.target.value });
+                if (errors.fio) setErrors((prev) => ({ ...prev, fio: "" }));
               }}
-            >
-              + Добавить даты заезда/выезда
-            </button>
-          ) : (
+            />
+            {errors.fio ? (
+              <div style={{ color: "#dc2626", fontSize: 12, marginTop: 4 }}>
+                {errors.fio}
+              </div>
+            ) : null}
+          </div>
+
+          <div>
+            <Input
+              label="Номер авто*"
+              placeholder="Напр. A444FF74"
+              value={form.plate}
+              onChange={(e) => {
+                setForm({ ...form, plate: e.target.value });
+                if (errors.plate) setErrors((prev) => ({ ...prev, plate: "" }));
+              }}
+            />
+            {errors.plate ? (
+              <div style={{ color: "#dc2626", fontSize: 12, marginTop: 4 }}>
+                {errors.plate}
+              </div>
+            ) : null}
+          </div>
+
+          {showDateTimeFields ? (
             <div className="col" style={{ gap: 10 }}>
               <div className="col" style={{ gap: 6 }}>
-                <div className="muted" style={{ fontWeight: 800 }}>Дата заезда</div>
+                <div className="muted" style={{ fontWeight: 800 }}>Дата въезда *</div>
                 <input
                   className="input"
                   type="date"
@@ -555,23 +636,41 @@ export default function Guests({ state, setState }) {
                     setForm({
                       ...form,
                       entryDate: newEntryDate,
-                      exitDate: newEntryDate,
+                      exitDate: form.exitDate || newEntryDate,
                     });
+                    if (errors.entryDate) {
+                      setErrors((prev) => ({ ...prev, entryDate: "" }));
+                    }
                   }}
                 />
+                {errors.entryDate ? (
+                  <div style={{ color: "#dc2626", fontSize: 12 }}>
+                    {errors.entryDate}
+                  </div>
+                ) : null}
               </div>
 
               <div className="col" style={{ gap: 6 }}>
-                <div className="muted" style={{ fontWeight: 800 }}>Дата выезда</div>
+                <div className="muted" style={{ fontWeight: 800 }}>Дата выезда *</div>
                 <input
                   className="input"
                   type="date"
                   value={form.exitDate}
-                  onChange={(e) => setForm({ ...form, exitDate: e.target.value })}
+                  onChange={(e) => {
+                    setForm({ ...form, exitDate: e.target.value });
+                    if (errors.exitDate) {
+                      setErrors((prev) => ({ ...prev, exitDate: "" }));
+                    }
+                  }}
                 />
+                {errors.exitDate ? (
+                  <div style={{ color: "#dc2626", fontSize: 12 }}>
+                    {errors.exitDate}
+                  </div>
+                ) : null}
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       </Modal>
     </div>
