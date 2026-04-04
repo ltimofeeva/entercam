@@ -63,12 +63,29 @@ function createEmptyForm() {
   };
 }
 
+function isGuestActiveByTime(guest) {
+  const timeTo = guest?.time_to || guest?.exitTime || "";
+
+  if (!timeTo) return true;
+
+  const [hours, minutes] = timeTo.split(":").map(Number);
+
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return true;
+
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const guestMinutes = hours * 60 + minutes;
+
+  return guestMinutes > currentMinutes;
+}
+
 export default function Guests({ state, setState }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [showDateTimeFields, setShowDateTimeFields] = useState(false);
+  const [activeTab, setActiveTab] = useState("active");
 
   const [form, setForm] = useState(createEmptyForm());
 
@@ -76,9 +93,22 @@ export default function Guests({ state, setState }) {
 
   const list = useMemo(() => {
     const qq = normPlate(q);
-    if (!qq) return guestsArray;
-    return guestsArray.filter((g) => normPlate(g?.plate || "").includes(qq));
-  }, [q, guestsArray]);
+
+    let filtered = guestsArray;
+
+    if (qq) {
+      filtered = filtered.filter((g) =>
+        normPlate(g?.plate || "").includes(qq)
+      );
+    }
+
+    filtered = filtered.filter((g) => {
+      const isActive = isGuestActiveByTime(g);
+      return activeTab === "active" ? isActive : !isActive;
+    });
+
+    return filtered;
+  }, [q, guestsArray, activeTab]);
 
   const resetForm = () => {
     setForm(createEmptyForm());
@@ -327,14 +357,38 @@ export default function Guests({ state, setState }) {
         onChange={(e) => setQ(e.target.value)}
       />
 
-      {guestsArray.length === 0 ? (
+      <div className="row" style={{ gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+        <button
+          className={`btn ${activeTab === "active" ? "primary" : ""}`}
+          onClick={() => setActiveTab("active")}
+          disabled={saving}
+        >
+          Активные
+        </button>
+
+        <button
+          className={`btn ${activeTab === "inactive" ? "primary" : ""}`}
+          onClick={() => setActiveTab("inactive")}
+          disabled={saving}
+        >
+          Неактивные
+        </button>
+      </div>
+
+      {list.length === 0 ? (
         <EmptyState
-          title="Гостевых машин нет"
-          hint="Добавьте первую гостевую машину."
+          title={activeTab === "active" ? "Активных машин нет" : "Неактивных машин нет"}
+          hint={
+            activeTab === "active"
+              ? "Нет машин с актуальным временем выезда."
+              : "Нет машин с истёкшим временем выезда."
+          }
           action={
-            <button className="btn primary" onClick={openAddModal}>
-              + Добавить
-            </button>
+            activeTab === "active" ? (
+              <button className="btn primary" onClick={openAddModal}>
+                + Добавить
+              </button>
+            ) : null
           }
         />
       ) : null}
