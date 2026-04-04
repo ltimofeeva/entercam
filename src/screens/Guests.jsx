@@ -415,61 +415,69 @@ export default function Guests({ state, setState }) {
       ) : null}
 
       <div className="list">
-        {list.map((g) => (
-          <Card key={g.id}>
-            <div className="col">
-              <div className="row">
-                <div className="big">{g.plate}</div>
-              </div>
+        {list.map((g) => {
+          const isInactiveTab = activeTab === "inactive";
 
-              {g.fio || g.name ? (
-                <div className="muted">ФИО: {g.fio || g.name}</div>
-              ) : null}
-
-              {g.entryDate ? (
-                <div className="muted">
-                  Дата заезда: {formatDateDisplay(g.entryDate)}
+          return (
+            <Card key={g.id}>
+              <div className="col">
+                <div className="row">
+                  <div className="big">{g.plate}</div>
                 </div>
-              ) : null}
 
-              {g.entryTime ? (
-                <div className="muted">Время заезда: {g.entryTime}</div>
-              ) : null}
+                {g.fio || g.name ? (
+                  <div className="muted">ФИО: {g.fio || g.name}</div>
+                ) : null}
 
-              {g.exitDate ? (
-                <div className="muted">
-                  Дата выезда: {formatDateDisplay(g.exitDate)}
+                {g.entryDate ? (
+                  <div className="muted">
+                    Дата заезда: {formatDateDisplay(g.entryDate)}
+                  </div>
+                ) : null}
+
+                {g.entryTime ? (
+                  <div className="muted">Время заезда: {g.entryTime}</div>
+                ) : null}
+
+                {g.exitDate ? (
+                  <div className="muted">
+                    Дата выезда: {formatDateDisplay(g.exitDate)}
+                  </div>
+                ) : null}
+
+                {g.exitTime ? (
+                  <div className="muted">Время выезда: {g.exitTime}</div>
+                ) : null}
+
+                <div className="row" style={{ marginTop: 10, gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    className="btn"
+                    onClick={() => openEditModal(g)}
+                    disabled={saving}
+                  >
+                    Изменить
+                  </button>
+
+                  <button
+                    className={isInactiveTab ? "btn" : "btn primary"}
+                    onClick={() => allowGuestExit(g)}
+                    disabled={saving}
+                  >
+                    Разрешить выезд
+                  </button>
+
+                  <button
+                    className={isInactiveTab ? "btn" : "btn danger"}
+                    onClick={() => deleteGuest(g)}
+                    disabled={saving}
+                  >
+                    Удалить
+                  </button>
                 </div>
-              ) : null}
-
-              {g.exitTime ? (
-                <div className="muted">Время выезда: {g.exitTime}</div>
-              ) : null}
-
-              <div className="row" style={{ marginTop: 10, gap: 8, flexWrap: "wrap" }}>
-                <button className="btn" onClick={() => openEditModal(g)} disabled={saving}>
-                  Изменить
-                </button>
-
-                <button
-                  className="btn primary"
-                  onClick={() => allowGuestExit(g)}
-                  disabled={saving}
-                >
-                  Разрешить выезд
-                </button>
-
-                <button
-                  className="btn danger"
-                  onClick={() => deleteGuest(g)}
-                  disabled={saving}
-                >
-                  Удалить
-                </button>
               </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
       </div>
 
       <Modal
