@@ -4,6 +4,7 @@ import Input from "../components/Input.jsx";
 import Modal from "../components/Modal.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import { normPlate, uid } from "../lib/utils.js";
+import { getTgContext } from "../lib/tg.js";
 
 function normalizeGuests(input) {
   if (!input) return [];
@@ -135,10 +136,12 @@ export default function Guests({ state, setState }) {
 
   const guestsArray = normalizeGuests(state?.guests);
 
-  const getDepartmentData = () => ({
-    department: state?.current_user?.department || "",
-    department_id: state?.current_user?.department_id || "",
-  });
+  const getChatIdData = () => {
+    const ctx = getTgContext();
+    return {
+      chat_id: state?.currentUser?.chat_id || ctx?.user_id || "",
+    };
+  };
 
   const list = useMemo(() => {
     const qq = normPlate(q);
@@ -196,8 +199,7 @@ export default function Guests({ state, setState }) {
     exitDate: guest.exitDate || "",
     exitTime: guest.exitTime || "",
     type: guest.type || "car_number",
-    department: guest.department || "",
-    department_id: guest.department_id || "",
+    chat_id: guest.chat_id || "",
   });
 
   const validateForm = () => {
@@ -210,8 +212,7 @@ export default function Guests({ state, setState }) {
     if (!(form.plate || "").trim()) {
       nextErrors.plate = "Заполните поле «Номер авто»";
     } else if (!isValidCarPlate(form.plate)) {
-      nextErrors.plate =
-        "Неверный формат номера авто. Пример: Н123НН74";
+      nextErrors.plate = "Неверный формат номера авто. Пример: Н123НН74";
     }
 
     if (!(form.entryDate || "").trim()) {
@@ -238,7 +239,7 @@ export default function Guests({ state, setState }) {
 
     const plate = normPlate(normalizePlateForValidation(form.plate));
     const fio = (form.fio || "").trim();
-    const departmentData = getDepartmentData();
+    const chatIdData = getChatIdData();
 
     const payload = {
       fio,
@@ -248,7 +249,7 @@ export default function Guests({ state, setState }) {
       exitDate: form.exitDate,
       exitTime: showDateTimeFields ? form.exitTime : "",
       type: "car_number",
-      ...departmentData,
+      ...chatIdData,
     };
 
     try {
@@ -265,8 +266,7 @@ export default function Guests({ state, setState }) {
           exitDate: payload.exitDate,
           exitTime: payload.exitTime,
           type: payload.type,
-          department: payload.department,
-          department_id: payload.department_id,
+          chat_id: payload.chat_id,
         };
 
         const res = await fetch("https://n8n.lpaderina.ru/webhook/guest_change", {
@@ -300,8 +300,7 @@ export default function Guests({ state, setState }) {
                     exitDate: updatedGuest.exitDate,
                     exitTime: updatedGuest.exitTime,
                     type: updatedGuest.type,
-                    department: updatedGuest.department,
-                    department_id: updatedGuest.department_id,
+                    chat_id: updatedGuest.chat_id,
                   }
                 : g
             ),
@@ -318,8 +317,7 @@ export default function Guests({ state, setState }) {
           exitDate: payload.exitDate,
           exitTime: payload.exitTime,
           type: payload.type,
-          department: payload.department,
-          department_id: payload.department_id,
+          chat_id: payload.chat_id,
         };
 
         const res = await fetch("https://n8n.lpaderina.ru/webhook/guest_add", {
@@ -375,8 +373,7 @@ export default function Guests({ state, setState }) {
             exitDate: guest.exitDate || "",
             exitTime: guest.exitTime || "",
             type: guest.type || "car_number",
-            department: guest.department || state?.current_user?.department || "",
-            department_id: guest.department_id || state?.current_user?.department_id || "",
+            chat_id: guest.chat_id || state?.currentUser?.chat_id || getTgContext()?.user_id || "",
           }),
         }),
       });
@@ -417,8 +414,7 @@ export default function Guests({ state, setState }) {
         exitDate: currentDate,
         exitTime: currentTime,
         type: guest.type || "car_number",
-        department: guest.department || state?.current_user?.department || "",
-        department_id: guest.department_id || state?.current_user?.department_id || "",
+        chat_id: guest.chat_id || state?.currentUser?.chat_id || getTgContext()?.user_id || "",
       };
 
       const res = await fetch("https://n8n.lpaderina.ru/webhook/guest_allow", {
@@ -530,13 +526,11 @@ export default function Guests({ state, setState }) {
                   </div>
                 ) : null}
 
-
                 {g.exitDate ? (
                   <div className="muted">
                     Дата выезда: {formatDateDisplay(g.exitDate)}
                   </div>
                 ) : null}
-
 
                 <div className="row" style={{ marginTop: 10, gap: 8, flexWrap: "wrap" }}>
                   <button
