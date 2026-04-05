@@ -1,41 +1,42 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Card from "../components/Card.jsx";
 import Input from "../components/Input.jsx";
-import Modal from "../components/Modal.jsx";
 import EmptyState from "../components/EmptyState.jsx";
-import { normPlate, uid } from "../lib/utils.js";
+import { uid } from "../lib/utils.js";
+import { api } from "../lib/api.js";
 import { getTgContext } from "../lib/tg.js";
 
-const GET_EMPLOYEE_CARS_WEBHOOK =
-  "https://n8n.lpaderina.ru/webhook/get_employee_cars";
+const ADD_EMPLOYEE_WEBHOOK =
+  "https://n8n.lpaderina.ru/webhook/add_employee";
 
-const ADD_EMPLOYEE_CAR_WEBHOOK =
-  "https://n8n.lpaderina.ru/webhook/add_employee_car";
+function normalizeApiResponse(raw) {
+  const data = Array.isArray(raw) ? raw[0] : raw;
+  const ok = Boolean(data?.authorized ?? data?.ok ?? data?.result);
 
-const DELETE_EMPLOYEE_CAR_WEBHOOK =
-  "https://n8n.lpaderina.ru/webhook/delete_employee_car";
+  const user = data?.user ?? null;
 
-const CHANGE_EMPLOYEE_WEBHOOK =
-  "https://n8n.lpaderina.ru/webhook/change_employee";
-
-function normalizeCarsResponse(raw) {
-  const root = Array.isArray(raw) ? raw[0] : raw;
-  const carsRaw =
-    (Array.isArray(root?.cars) && root.cars) ||
-    (Array.isArray(root?.data?.cars) && root.data.cars) ||
-    (Array.isArray(root?.["Машины"]) && root["Машины"]) ||
+  const employeesRaw =
+    (Array.isArray(data?.employees) && data.employees) ||
+    (Array.isArray(data?.["Сотрудники"]) && data["Сотрудники"]) ||
     [];
 
-  return carsRaw.map((car) => ({
-    id: car.id ?? uid(),
-    plate: normPlate(car.plate ?? car.number ?? car.gosnomer ?? ""),
-    brand: car.brand ?? "",
-    model: car.model ?? "",
-    color: car.color ?? "",
+  const employees = employeesRaw.map((e) => ({
+    id: e.id ?? uid(),
+    name: e.name ?? e.fio ?? e.FIO ?? "",
+    phone: e.phone
+      ? String(e.phone).startsWith("+")
+        ? String(e.phone)
+        : `+${String(e.phone)}`
+      : "",
+    email: e.email ?? "",
+    dept: e.dept ?? e.department ?? user?.department ?? "",
+    cars: Array.isArray(e.cars) ? e.cars : [],
   }));
+
+  return { ok, user, employees };
 }
 
-function normalizeChangedEmployeeResponse(raw, fallback) {
+function normalizeCreatedEmployeeResponse(raw, fallback) {
   const data = Array.isArray(raw) ? raw[0] : raw;
 
   const employeeRaw =
@@ -54,7 +55,10 @@ function normalizeChangedEmployeeResponse(raw, fallback) {
         : `+${String(employeeRaw.phone)}`
       : fallback.phone,
     email: employeeRaw?.email ?? fallback.email,
-    dept: employeeRaw?.dept ?? employeeRaw?.department ?? fallback.dept,
+    dept:
+      employeeRaw?.dept ??
+      employeeRaw?.department ??
+      fallback.dept,
     cars: Array.isArray(employeeRaw?.cars) ? employeeRaw.cars : fallback.cars,
   };
 }
@@ -64,102 +68,82 @@ function isValidPhone(value) {
   return /^9\d{9}$/.test(digits);
 }
 
-export default function EmployeeDetail({ state, setState, employeeId, goBack }) {
-  const employee = useMemo(() => {
-    return (state.employees || []).find((e) => String(e.id) === String(employeeId));
-  }, [state.employees, employeeId]);
-
-  const [cars, setCars] = useState(employee?.cars || []);
-  const [loadingCars, setLoadingCars] = useState(false);
-
-  const [editOpen, setEditOpen] = useState(false);
-  const [savingEmployee, setSavingEmployee] = useState(false);
-  const [employeeForm, setEmployeeForm] = useState({
+export default function Employees({ state, setState, goEmployee }) {
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
     name: "",
     phone: "",
     email: "",
     dept: "",
   });
 
+  const [loading, setLoading] = useState(true);
+  const [authorized, setAuthorized] = useState(null);
+  const [departmentName, setDepartmentName] = useState("");
+  const [saving, setSaving] = useState(false);
+
   const [nameError, setNameError] = useState("");
   const [phoneError, setPhoneError] = useState("");
 
-  const [carOpen, setCarOpen] = useState(false);
-  const [savingCar, setSavingCar] = useState(false);
-  const [carForm, setCarForm] = useState({
-    plate: "",
-    brand: "",
-    model: "",
-    color: "",
-  });
-
   useEffect(() => {
-    if (!employee) return;
-
-    setEmployeeForm({
-      name: employee.name || "",
-      phone: (employee.phone || "").replace(/^\+/, ""),
-      email: employee.email || "",
-      dept: employee.dept || "",
-    });
-
-    setCars(Array.isArray(employee.cars) ? employee.cars : []);
-  }, [employee]);
-
-  useEffect(() => {
-    if (!employee?.id) return;
-
     let cancelled = false;
 
     (async () => {
       try {
-        setLoadingCars(true);
+        setLoading(true);
 
         const ctx = getTgContext();
         const userId = ctx?.user_id ?? null;
 
-        const payload = {
-          event: "get_employee_cars",
-          ts: new Date().toISOString(),
-          user_id: userId,
-          current_user: state.currentUser ?? null,
-          employee: {
-            id: employee.id,
-          },
-        };
-
-        const res = await fetch(GET_EMPLOYEE_CARS_WEBHOOK, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        });
-
-        if (!res.ok) {
-          throw new Error(`Webhook error: ${res.status}`);
+        if (!userId) {
+          if (!cancelled) {
+            setAuthorized(false);
+            setLoading(false);
+          }
+          return;
         }
 
-        const raw = await res.json();
-        const normalizedCars = normalizeCarsResponse(raw);
+        const payload = {
+          event: "employee_open",
+          user_id: userId,
+          ts: new Date().toISOString(),
+        };
+
+        const raw = await api.employeeCheck(payload);
+        const { ok, user, employees } = normalizeApiResponse(raw);
 
         if (cancelled) return;
 
-        setCars(normalizedCars);
+        if (!ok) {
+          setAuthorized(false);
+          setLoading(false);
+          return;
+        }
+
+        setAuthorized(true);
+
+        const depName =
+          user?.department ??
+          (Array.isArray(raw) ? raw[0] : raw)?.department?.name ??
+          (Array.isArray(raw) ? raw[0] : raw)?.department_name ??
+          (Array.isArray(raw) ? raw[0] : raw)?.dept_name ??
+          "";
+
+        setDepartmentName(depName);
 
         setState((s) => ({
           ...s,
-          employees: (s.employees || []).map((item) =>
-            String(item.id) === String(employee.id)
-              ? { ...item, cars: normalizedCars }
-              : item
-          ),
+          currentUser: user,
+          employees,
         }));
+
+        setLoading(false);
       } catch (e) {
-        console.error("get_employee_cars error:", e);
-      } finally {
+        console.error("employeeCheck error:", e);
         if (!cancelled) {
-          setLoadingCars(false);
+          setAuthorized(false);
+          setLoading(false);
         }
       }
     })();
@@ -167,40 +151,42 @@ export default function EmployeeDetail({ state, setState, employeeId, goBack }) 
     return () => {
       cancelled = true;
     };
-  }, [employee?.id, setState, state.currentUser]);
+  }, [setState]);
 
-  const resetEmployeeErrors = () => {
+  const list = useMemo(() => {
+    const qq = q.trim().toLowerCase();
+    if (!qq) return state.employees || [];
+
+    return (state.employees || []).filter((e) => {
+      const hay = `${e.name} ${e.phone} ${e.email} ${e.dept}`.toLowerCase();
+      return hay.includes(qq);
+    });
+  }, [q, state.employees]);
+
+  const resetForm = () => {
+    setForm({
+      name: "",
+      phone: "",
+      email: "",
+      dept: "",
+    });
     setNameError("");
     setPhoneError("");
   };
 
-  const openEdit = () => {
-    if (!employee) return;
-
-    setEmployeeForm({
-      name: employee.name || "",
-      phone: (employee.phone || "").replace(/^\+/, ""),
-      email: employee.email || "",
-      dept: employee.dept || "",
-    });
-
-    resetEmployeeErrors();
-    setEditOpen(true);
-  };
-
-  const saveEmployee = async () => {
-    if (!employee || savingEmployee) return;
+  const addEmployee = async () => {
+    if (saving) return;
 
     let hasError = false;
 
-    if (!employeeForm.name.trim()) {
+    if (!form.name.trim()) {
       setNameError("Введите ФИО");
       hasError = true;
     } else {
       setNameError("");
     }
 
-    if (!employeeForm.phone.trim() || !isValidPhone(employeeForm.phone)) {
+    if (!form.phone.trim() || !isValidPhone(form.phone)) {
       setPhoneError("Введите номер телефона начиная с 9");
       hasError = true;
     } else {
@@ -212,23 +198,27 @@ export default function EmployeeDetail({ state, setState, employeeId, goBack }) 
     const ctx = getTgContext();
     const userId = ctx?.user_id ?? null;
 
-    const phoneDigits = employeeForm.phone.trim().replace(/\D/g, "");
+    const phoneDigits = form.phone.trim().replace(/\D/g, "");
 
     const draftEmployee = {
-      ...employee,
-      name: employeeForm.name.trim(),
+      id: uid(),
+      name: form.name.trim(),
       phone: phoneDigits,
-      email: employeeForm.email.trim(),
-      dept: employeeForm.dept.trim(),
+      email: form.email.trim(),
+      dept:
+        form.dept.trim() ||
+        departmentName ||
+        state.currentUser?.department ||
+        "",
+      cars: [],
     };
 
     const payload = {
-      event: "change_employee",
+      event: "add_employee",
       ts: new Date().toISOString(),
       user_id: userId,
       current_user: state.currentUser ?? null,
       employee: {
-        id: employee.id,
         name: draftEmployee.name,
         phone: draftEmployee.phone,
         email: draftEmployee.email,
@@ -237,9 +227,9 @@ export default function EmployeeDetail({ state, setState, employeeId, goBack }) 
     };
 
     try {
-      setSavingEmployee(true);
+      setSaving(true);
 
-      const res = await fetch(CHANGE_EMPLOYEE_WEBHOOK, {
+      const res = await fetch(ADD_EMPLOYEE_WEBHOOK, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -252,168 +242,40 @@ export default function EmployeeDetail({ state, setState, employeeId, goBack }) 
       }
 
       const raw = await res.json();
-      const savedEmployee = normalizeChangedEmployeeResponse(raw, draftEmployee);
+      const savedEmployee = normalizeCreatedEmployeeResponse(raw, draftEmployee);
 
       setState((s) => ({
         ...s,
-        employees: (s.employees || []).map((item) =>
-          String(item.id) === String(employee.id)
-            ? {
-                ...item,
-                ...savedEmployee,
-                cars: Array.isArray(item.cars) ? item.cars : [],
-              }
-            : item
-        ),
+        employees: [savedEmployee, ...(s.employees || [])],
       }));
 
-      setEditOpen(false);
+      resetForm();
+      setOpen(false);
     } catch (e) {
-      console.error("changeEmployee error:", e);
-      alert("Не удалось изменить сотрудника. Проверьте вебхук или сеть.");
+      console.error("addEmployee error:", e);
+      alert("Не удалось сохранить сотрудника. Проверьте вебхук или сеть.");
     } finally {
-      setSavingEmployee(false);
+      setSaving(false);
     }
   };
 
-  const addCar = async () => {
-    if (!employee || !carForm.plate.trim() || savingCar) return;
-
-    const ctx = getTgContext();
-    const userId = ctx?.user_id ?? null;
-
-    const draftCar = {
-      id: uid(),
-      plate: normPlate(carForm.plate),
-      brand: carForm.brand.trim(),
-      model: carForm.model.trim(),
-      color: carForm.color.trim(),
-    };
-
-    const payload = {
-      event: "add_employee_car",
-      ts: new Date().toISOString(),
-      user_id: userId,
-      current_user: state.currentUser ?? null,
-      employee: {
-        id: employee.id,
-      },
-      car: {
-        plate: draftCar.plate,
-        brand: draftCar.brand,
-        model: draftCar.model,
-        color: draftCar.color,
-      },
-    };
-
-    try {
-      setSavingCar(true);
-
-      const res = await fetch(ADD_EMPLOYEE_CAR_WEBHOOK, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Webhook error: ${res.status}`);
-      }
-
-      setCars((prev) => [draftCar, ...prev]);
-
-      setState((s) => ({
-        ...s,
-        employees: (s.employees || []).map((item) =>
-          String(item.id) === String(employee.id)
-            ? {
-                ...item,
-                cars: [draftCar, ...(item.cars || [])],
-              }
-            : item
-        ),
-      }));
-
-      setCarForm({
-        plate: "",
-        brand: "",
-        model: "",
-        color: "",
-      });
-      setCarOpen(false);
-    } catch (e) {
-      console.error("add_employee_car error:", e);
-      alert("Не удалось добавить машину. Проверьте вебхук или сеть.");
-    } finally {
-      setSavingCar(false);
-    }
-  };
-
-  const deleteCar = async (carId) => {
-    if (!employee || !carId) return;
-
-    const ctx = getTgContext();
-    const userId = ctx?.user_id ?? null;
-
-    const payload = {
-      event: "delete_employee_car",
-      ts: new Date().toISOString(),
-      user_id: userId,
-      current_user: state.currentUser ?? null,
-      employee: {
-        id: employee.id,
-      },
-      car: {
-        id: carId,
-      },
-    };
-
-    try {
-      const res = await fetch(DELETE_EMPLOYEE_CAR_WEBHOOK, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Webhook error: ${res.status}`);
-      }
-
-      setCars((prev) => prev.filter((car) => String(car.id) !== String(carId)));
-
-      setState((s) => ({
-        ...s,
-        employees: (s.employees || []).map((item) =>
-          String(item.id) === String(employee.id)
-            ? {
-                ...item,
-                cars: (item.cars || []).filter(
-                  (car) => String(car.id) !== String(carId)
-                ),
-              }
-            : item
-        ),
-      }));
-    } catch (e) {
-      console.error("delete_employee_car error:", e);
-      alert("Не удалось удалить машину. Проверьте вебхук или сеть.");
-    }
-  };
-
-  if (!employee) {
+  if (loading) {
     return (
       <div className="content">
         <EmptyState
-          title="Сотрудник не найден"
-          hint="Вернитесь назад и попробуйте открыть карточку ещё раз."
-          action={
-            <button className="btn primary" onClick={goBack}>
-              Назад
-            </button>
-          }
+          title="Загрузка…"
+          hint="Проверяем доступ и получаем сотрудников."
+        />
+      </div>
+    );
+  }
+
+  if (authorized === false) {
+    return (
+      <div className="content">
+        <EmptyState
+          title="Пройдите регистрацию через бота"
+          hint="После регистрации откройте мини-приложение ещё раз."
         />
       </div>
     );
@@ -421,83 +283,72 @@ export default function EmployeeDetail({ state, setState, employeeId, goBack }) 
 
   return (
     <div className="content">
-      <button className="btn" onClick={goBack}>
-        ← Назад
-      </button>
+      <Input
+        placeholder="Поиск по имени / телефону"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+      />
 
-      <Card>
-        <div className="col" style={{ gap: 8 }}>
-          <div className="big">{employee.name || "Без имени"}</div>
-          {employee.phone ? <div className="muted">{employee.phone}</div> : null}
-          {employee.email ? <div className="muted">{employee.email}</div> : null}
-          <div className="muted">Отдел: {employee.dept || "Не указан"}</div>
-        </div>
+      {(state.employees || []).length === 0 ? (
+        <EmptyState
+          title="Сотрудников пока нет"
+          hint="В этом отделе пока нет сотрудников."
+          action={
+            <button
+              className="btn primary"
+              onClick={() => {
+                resetForm();
+                setOpen(true);
+              }}
+            >
+              + Добавить
+            </button>
+          }
+        />
+      ) : null}
 
-        <div style={{ marginTop: 12 }}>
-          <button className="btn primary" onClick={openEdit}>
-            Изменить сотрудника
-          </button>
-        </div>
-      </Card>
+      <div className="list">
+        {list.map((e) => (
+          <Card key={e.id} onClick={() => goEmployee(e.id)}>
+            <div className="row">
+              <div className="col">
+                <div className="big">{e.name || "Без имени"}</div>
+                {e.phone ? <div className="muted">{e.phone}</div> : null}
+                {e.email ? <div className="muted">{e.email}</div> : null}
+                <div className="muted">Отдел: {e.dept || "Не указан"}</div>
+              </div>
 
-      <div className="row" style={{ justifyContent: "space-between", marginTop: 12 }}>
-        <div className="big">Машины сотрудника</div>
-        <button className="btn primary" onClick={() => setCarOpen(true)}>
-          + Добавить машину
-        </button>
+              <div className="muted" style={{ fontWeight: 900 }}>
+                ›
+              </div>
+            </div>
+          </Card>
+        ))}
       </div>
 
-      {loadingCars ? (
-        <EmptyState title="Загрузка…" hint="Получаем машины сотрудника." />
-      ) : cars.length === 0 ? (
-        <EmptyState
-          title="Машин пока нет"
-          hint="Добавьте первую машину сотрудника."
-        />
-      ) : (
-        <div className="list">
-          {cars.map((car) => (
-            <Card key={car.id}>
-              <div className="row" style={{ alignItems: "center" }}>
-                <div className="col">
-                  <div className="big">{car.plate || "Без номера"}</div>
-                  {car.brand || car.model ? (
-                    <div className="muted">
-                      {[car.brand, car.model].filter(Boolean).join(" ")}
-                    </div>
-                  ) : null}
-                  {car.color ? <div className="muted">{car.color}</div> : null}
-                </div>
+      <button
+        className="btn primary"
+        onClick={() => {
+          resetForm();
+          setOpen(true);
+        }}
+      >
+        + Добавить сотрудника
+      </button>
 
-                <button
-                  className="btn"
-                  onClick={() => deleteCar(car.id)}
-                  style={{ color: "#dc2626" }}
-                >
-                  Удалить
-                </button>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {editOpen ? (
-        <div
-          className="modalBack"
-          onMouseDown={() => !savingEmployee && setEditOpen(false)}
-        >
+      {open ? (
+        <div className="modalBack" onMouseDown={() => !saving && setOpen(false)}>
           <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="modalTitle">Изменить сотрудника</div>
+            <div className="modalTitle">Добавить сотрудника</div>
 
             <div className="col" style={{ gap: 10 }}>
               <div>
                 <Input
                   label="ФИО*"
                   placeholder="Иванов Иван Иванович"
-                  value={employeeForm.name}
+                  value={form.name}
                   onChange={(e) => {
-                    setEmployeeForm({ ...employeeForm, name: e.target.value });
+                    setForm({ ...form, name: e.target.value });
                     if (nameError) setNameError("");
                   }}
                 />
@@ -518,9 +369,9 @@ export default function EmployeeDetail({ state, setState, employeeId, goBack }) 
                 <Input
                   label="Телефон*"
                   placeholder="9512244555"
-                  value={employeeForm.phone}
+                  value={form.phone}
                   onChange={(e) => {
-                    setEmployeeForm({ ...employeeForm, phone: e.target.value });
+                    setForm({ ...form, phone: e.target.value });
                     if (phoneError) setPhoneError("");
                   }}
                 />
@@ -539,17 +390,20 @@ export default function EmployeeDetail({ state, setState, employeeId, goBack }) 
 
               <Input
                 label="Email"
-                value={employeeForm.email}
-                onChange={(e) =>
-                  setEmployeeForm({ ...employeeForm, email: e.target.value })
-                }
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
 
               <Input
                 label="Отдел"
-                value={employeeForm.dept}
-                onChange={(e) =>
-                  setEmployeeForm({ ...employeeForm, dept: e.target.value })
+                value={form.dept}
+                onChange={(e) => setForm({ ...form, dept: e.target.value })}
+                placeholder={
+                  departmentName || state.currentUser?.department
+                    ? `По умолчанию: ${
+                        departmentName || state.currentUser?.department
+                      }`
+                    : ""
                 }
               />
             </div>
@@ -557,74 +411,17 @@ export default function EmployeeDetail({ state, setState, employeeId, goBack }) 
             <div className="modalActions">
               <button
                 className="btn"
-                onClick={() => setEditOpen(false)}
-                disabled={savingEmployee}
+                onClick={() => setOpen(false)}
+                disabled={saving}
               >
                 Отмена
               </button>
               <button
                 className="btn primary"
-                onClick={saveEmployee}
-                disabled={savingEmployee}
+                onClick={addEmployee}
+                disabled={saving}
               >
-                {savingEmployee ? "Сохраняем..." : "Сохранить"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {carOpen ? (
-        <div className="modalBack" onMouseDown={() => !savingCar && setCarOpen(false)}>
-          <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="modalTitle">Добавить машину</div>
-
-            <div className="col" style={{ gap: 10 }}>
-              <Input
-                label="Госномер*"
-                value={carForm.plate}
-                onChange={(e) =>
-                  setCarForm({ ...carForm, plate: e.target.value })
-                }
-                placeholder="A123AA174"
-              />
-              <Input
-                label="Марка"
-                value={carForm.brand}
-                onChange={(e) =>
-                  setCarForm({ ...carForm, brand: e.target.value })
-                }
-              />
-              <Input
-                label="Модель"
-                value={carForm.model}
-                onChange={(e) =>
-                  setCarForm({ ...carForm, model: e.target.value })
-                }
-              />
-              <Input
-                label="Цвет"
-                value={carForm.color}
-                onChange={(e) =>
-                  setCarForm({ ...carForm, color: e.target.value })
-                }
-              />
-            </div>
-
-            <div className="modalActions">
-              <button
-                className="btn"
-                onClick={() => setCarOpen(false)}
-                disabled={savingCar}
-              >
-                Отмена
-              </button>
-              <button
-                className="btn primary"
-                onClick={addCar}
-                disabled={!carForm.plate.trim() || savingCar}
-              >
-                {savingCar ? "Сохраняем..." : "Добавить"}
+                {saving ? "Сохраняем..." : "Сохранить"}
               </button>
             </div>
           </div>
