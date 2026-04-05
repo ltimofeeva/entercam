@@ -63,6 +63,11 @@ function normalizeCreatedEmployeeResponse(raw, fallback) {
   };
 }
 
+function isValidPhone(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  return /^9\d{9}$/.test(digits);
+}
+
 export default function Employees({ state, setState, goEmployee }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
@@ -77,6 +82,9 @@ export default function Employees({ state, setState, goEmployee }) {
   const [authorized, setAuthorized] = useState(null);
   const [departmentName, setDepartmentName] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const [nameError, setNameError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -155,16 +163,47 @@ export default function Employees({ state, setState, goEmployee }) {
     });
   }, [q, state.employees]);
 
+  const resetForm = () => {
+    setForm({
+      name: "",
+      phone: "",
+      email: "",
+      dept: "",
+    });
+    setNameError("");
+    setPhoneError("");
+  };
+
   const addEmployee = async () => {
-    if (!form.name.trim() || saving) return;
+    if (saving) return;
+
+    let hasError = false;
+
+    if (!form.name.trim()) {
+      setNameError("Введите ФИО");
+      hasError = true;
+    } else {
+      setNameError("");
+    }
+
+    if (!form.phone.trim() || !isValidPhone(form.phone)) {
+      setPhoneError("Введите номер телефона начиная с 9");
+      hasError = true;
+    } else {
+      setPhoneError("");
+    }
+
+    if (hasError) return;
 
     const ctx = getTgContext();
     const userId = ctx?.user_id ?? null;
 
+    const phoneDigits = form.phone.trim().replace(/\D/g, "");
+
     const draftEmployee = {
       id: uid(),
       name: form.name.trim(),
-      phone: form.phone.trim(),
+      phone: phoneDigits,
       email: form.email.trim(),
       dept:
         form.dept.trim() ||
@@ -210,12 +249,7 @@ export default function Employees({ state, setState, goEmployee }) {
         employees: [savedEmployee, ...(s.employees || [])],
       }));
 
-      setForm({
-        name: "",
-        phone: "",
-        email: "",
-        dept: "",
-      });
+      resetForm();
       setOpen(false);
     } catch (e) {
       console.error("addEmployee error:", e);
@@ -260,7 +294,13 @@ export default function Employees({ state, setState, goEmployee }) {
           title="Сотрудников пока нет"
           hint="В этом отделе пока нет сотрудников."
           action={
-            <button className="btn primary" onClick={() => setOpen(true)}>
+            <button
+              className="btn primary"
+              onClick={() => {
+                resetForm();
+                setOpen(true);
+              }}
+            >
               + Добавить
             </button>
           }
@@ -286,7 +326,13 @@ export default function Employees({ state, setState, goEmployee }) {
         ))}
       </div>
 
-      <button className="btn primary" onClick={() => setOpen(true)}>
+      <button
+        className="btn primary"
+        onClick={() => {
+          resetForm();
+          setOpen(true);
+        }}
+      >
         + Добавить сотрудника
       </button>
 
@@ -296,21 +342,58 @@ export default function Employees({ state, setState, goEmployee }) {
             <div className="modalTitle">Добавить сотрудника</div>
 
             <div className="col" style={{ gap: 10 }}>
-              <Input
-                label="ФИО*"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-              />
-              <Input
-                label="Телефон"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              />
+              <div>
+                <Input
+                  label="ФИО*"
+                  placeholder="Иванов Иван Иванович"
+                  value={form.name}
+                  onChange={(e) => {
+                    setForm({ ...form, name: e.target.value });
+                    if (nameError) setNameError("");
+                  }}
+                />
+                {nameError ? (
+                  <div
+                    style={{
+                      marginTop: 6,
+                      fontSize: 13,
+                      color: "#dc2626",
+                    }}
+                  >
+                    {nameError}
+                  </div>
+                ) : null}
+              </div>
+
+              <div>
+                <Input
+                  label="Телефон*"
+                  placeholder="9512244555"
+                  value={form.phone}
+                  onChange={(e) => {
+                    setForm({ ...form, phone: e.target.value });
+                    if (phoneError) setPhoneError("");
+                  }}
+                />
+                {phoneError ? (
+                  <div
+                    style={{
+                      marginTop: 6,
+                      fontSize: 13,
+                      color: "#dc2626",
+                    }}
+                  >
+                    {phoneError}
+                  </div>
+                ) : null}
+              </div>
+
               <Input
                 label="Email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
+
               <Input
                 label="Отдел"
                 value={form.dept}
@@ -336,7 +419,7 @@ export default function Employees({ state, setState, goEmployee }) {
               <button
                 className="btn primary"
                 onClick={addEmployee}
-                disabled={!form.name.trim() || saving}
+                disabled={saving}
               >
                 {saving ? "Сохраняем..." : "Сохранить"}
               </button>
