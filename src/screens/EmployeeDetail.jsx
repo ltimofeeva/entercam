@@ -54,6 +54,49 @@ function normalizeCarsResponse(raw) {
     .filter(Boolean);
 }
 
+function normalizePlateForValidation(value) {
+  if (!value) return "";
+
+  const map = {
+    A: "A",
+    А: "A",
+    B: "B",
+    В: "B",
+    E: "E",
+    Е: "E",
+    K: "K",
+    К: "K",
+    M: "M",
+    М: "M",
+    H: "H",
+    Н: "H",
+    O: "O",
+    О: "O",
+    P: "P",
+    Р: "P",
+    C: "C",
+    С: "C",
+    T: "T",
+    Т: "T",
+    Y: "Y",
+    У: "Y",
+    X: "X",
+    Х: "X",
+  };
+
+  return String(value)
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .split("")
+    .map((char) => map[char] || char)
+    .join("");
+}
+
+function isValidCarPlate(value) {
+  const normalized = normalizePlateForValidation(value);
+  return /^[ABEKMHOPCTYX]\d{3}[ABEKMHOPCTYX]{2}\d{2,3}$/.test(normalized);
+}
+
 export default function EmployeeDetail({ state, setState, employeeId, onBack }) {
   const emp = useMemo(
     () => (state.employees || []).find((e) => e.id === employeeId),
@@ -63,6 +106,7 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [plate, setPlate] = useState("");
+  const [plateError, setPlateError] = useState("");
   const [editForm, setEditForm] = useState({
     name: "",
     phone: "",
@@ -170,9 +214,29 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
     );
   }
 
+  const validatePlate = (value) => {
+    const raw = (value || "").trim();
+
+    if (!raw) {
+      return "Введите госномер.";
+    }
+
+    if (!isValidCarPlate(raw)) {
+      return "Неверный формат номера. Пример: Н123НН74";
+    }
+
+    return "";
+  };
+
   const addCar = async () => {
-    const p = normPlate(plate);
-    if (!p || addingCar) return;
+    const validationError = validatePlate(plate);
+    if (validationError || addingCar) {
+      setPlateError(validationError);
+      if (validationError) alert(validationError);
+      return;
+    }
+
+    const p = normPlate(normalizePlateForValidation(plate));
 
     if (!emp?.id) {
       alert("У сотрудника отсутствует корректный ID. Проверьте ответ вебхука add_employee.");
@@ -236,6 +300,7 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
       }));
 
       setPlate("");
+      setPlateError("");
       setAddOpen(false);
     } catch (e) {
       console.error("addCar error:", e);
@@ -553,12 +618,21 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
       <Modal
         open={addOpen}
         title="Добавить машину"
-        onClose={() => !addingCar && setAddOpen(false)}
+        onClose={() => {
+          if (addingCar) return;
+          setAddOpen(false);
+          setPlate("");
+          setPlateError("");
+        }}
         actions={
           <>
             <button
               className="btn"
-              onClick={() => setAddOpen(false)}
+              onClick={() => {
+                setAddOpen(false);
+                setPlate("");
+                setPlateError("");
+              }}
               disabled={addingCar}
             >
               Отмена
@@ -566,7 +640,7 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
             <button
               className="btn primary"
               onClick={addCar}
-              disabled={!normPlate(plate) || addingCar}
+              disabled={!plate.trim() || !!validatePlate(plate) || addingCar}
             >
               {addingCar ? "Сохраняем..." : "Добавить"}
             </button>
@@ -575,10 +649,20 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
       >
         <Input
           label="Госномер*"
-          placeholder="Напр. A123BC174"
+          placeholder="Напр. Н123НН74"
           value={plate}
-          onChange={(e) => setPlate(e.target.value)}
+          onChange={(e) => {
+            setPlate(e.target.value);
+            if (plateError) {
+              setPlateError("");
+            }
+          }}
         />
+        {plateError ? (
+          <div style={{ color: "#dc2626", fontSize: 12, marginTop: 6 }}>
+            {plateError}
+          </div>
+        ) : null}
         <div className="muted" style={{ marginTop: 8 }}>
           Номер будет сохранён в верхнем регистре без пробелов.
         </div>
