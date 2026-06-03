@@ -97,6 +97,42 @@ function isValidCarPlate(value) {
   return /^[ABEKMHOPCTYX]\d{3}[ABEKMHOPCTYX]{2}\d{2,3}$/.test(normalized);
 }
 
+function formatPhone(value) {
+  let digits = String(value || "").replace(/\D/g, "");
+
+  if (!digits) return "";
+
+  if (digits[0] === "8") {
+    digits = "7" + digits.slice(1);
+  }
+
+  if (digits[0] !== "7") {
+    digits = "7" + digits;
+  }
+
+  digits = digits.slice(0, 11);
+
+  const country = "+7";
+  const p1 = digits.slice(1, 4);
+  const p2 = digits.slice(4, 7);
+  const p3 = digits.slice(7, 9);
+  const p4 = digits.slice(9, 11);
+
+  let result = country;
+
+  if (p1) result += ` (${p1}`;
+  if (p1.length === 3) result += ")";
+  if (p2) result += ` ${p2}`;
+  if (p3) result += `-${p3}`;
+  if (p4) result += `-${p4}`;
+
+  return result;
+}
+
+function normalizePhoneDigits(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
 export default function EmployeeDetail({ state, setState, employeeId, onBack }) {
   const emp = useMemo(
     () => (state.employees || []).find((e) => e.id === employeeId),
@@ -114,7 +150,11 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
     dept: "",
   });
 
-  const [confirm, setConfirm] = useState({ open: false, carId: null, carPlate: "" });
+  const [confirm, setConfirm] = useState({
+    open: false,
+    carId: null,
+    carPlate: "",
+  });
   const [confirmEmp, setConfirmEmp] = useState(false);
 
   const [deletingEmployee, setDeletingEmployee] = useState(false);
@@ -128,11 +168,11 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
 
     setEditForm({
       name: emp.name ?? "",
-      phone: emp.phone ?? "",
+      phone: formatPhone(emp.phone ?? ""),
       email: emp.email ?? "",
-      dept: emp.dept ?? "",
+      dept: emp.dept || state.currentUser?.department || "",
     });
-  }, [emp]);
+  }, [emp, state.currentUser]);
 
   useEffect(() => {
     let cancelled = false;
@@ -316,9 +356,9 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
     const nextEmployee = {
       id: emp.id,
       name: (editForm.name ?? "").trim(),
-      phone: (editForm.phone ?? "").trim(),
+      phone: normalizePhoneDigits(emp.phone),
       email: (editForm.email ?? "").trim(),
-      dept: (editForm.dept ?? "").trim(),
+      dept: emp.dept || state.currentUser?.department || "",
     };
 
     if (!nextEmployee.name) {
@@ -502,7 +542,7 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
       <Card>
         <div className="col">
           <div className="big">{emp.name}</div>
-          {emp.phone ? <div className="muted">{emp.phone}</div> : null}
+          {emp.phone ? <div className="muted">{formatPhone(emp.phone)}</div> : null}
           {emp.email || emp.dept ? (
             <div className="muted">
               {[emp.dept, emp.email].filter(Boolean).join(" • ")}
@@ -510,10 +550,7 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
           ) : null}
 
           <div style={{ marginTop: 12 }}>
-            <button
-              className="btn"
-              onClick={() => setEditOpen(true)}
-            >
+            <button className="btn" onClick={() => setEditOpen(true)}>
               Изменить данные о сотруднике
             </button>
           </div>
@@ -589,14 +626,13 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
             setEditForm((f) => ({ ...f, name: e.target.value }))
           }
         />
+
         <Input
           label="Телефон"
-          placeholder="+7..."
-          value={editForm.phone}
-          onChange={(e) =>
-            setEditForm((f) => ({ ...f, phone: e.target.value }))
-          }
+          value={formatPhone(emp.phone)}
+          disabled
         />
+
         <Input
           label="Email"
           placeholder="example@mail.ru"
@@ -605,13 +641,11 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
             setEditForm((f) => ({ ...f, email: e.target.value }))
           }
         />
+
         <Input
           label="Отдел"
-          placeholder="Введите отдел"
-          value={editForm.dept}
-          onChange={(e) =>
-            setEditForm((f) => ({ ...f, dept: e.target.value }))
-          }
+          value={editForm.dept || state.currentUser?.department || ""}
+          disabled
         />
       </Modal>
 
@@ -672,7 +706,8 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
         open={confirm.open}
         title={`Удалить номер ${confirm.carPlate}?`}
         onClose={() =>
-          !deletingCarId && setConfirm({ open: false, carId: null, carPlate: "" })
+          !deletingCarId &&
+          setConfirm({ open: false, carId: null, carPlate: "" })
         }
         actions={
           <>
