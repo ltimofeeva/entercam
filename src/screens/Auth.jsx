@@ -1,12 +1,4 @@
-import { useState } from 'react'
-
-const departments = [
-  'Администрация',
-  'Отдел продаж',
-  'Охрана',
-  'Склад',
-  'Бухгалтерия',
-]
+import { useEffect, useState } from 'react'
 
 function formatPhone(value) {
   let digits = value.replace(/\D/g, '')
@@ -40,6 +32,33 @@ function formatPhone(value) {
   return result
 }
 
+function normalizeDepartments(data) {
+  if (!data) return []
+
+  if (Array.isArray(data)) {
+    return data.map((item) => ({
+      id: item.id || item.uuid || item.name || item.title,
+      name: item.name || item.title || item.department || String(item),
+    }))
+  }
+
+  if (Array.isArray(data.departments)) {
+    return data.departments.map((item) => ({
+      id: item.id || item.uuid || item.name || item.title,
+      name: item.name || item.title || item.department || String(item),
+    }))
+  }
+
+  if (Array.isArray(data.data)) {
+    return data.data.map((item) => ({
+      id: item.id || item.uuid || item.name || item.title,
+      name: item.name || item.title || item.department || String(item),
+    }))
+  }
+
+  return []
+}
+
 export default function Auth({ onLogin }) {
   const [tab, setTab] = useState('login')
 
@@ -49,6 +68,46 @@ export default function Auth({ onLogin }) {
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [department, setDepartment] = useState('')
+
+  const [departments, setDepartments] = useState([])
+  const [departmentsLoading, setDepartmentsLoading] = useState(false)
+  const [departmentsError, setDepartmentsError] = useState('')
+
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        setDepartmentsLoading(true)
+        setDepartmentsError('')
+
+        const response = await fetch('https://n8n.lpaderina.ru/webhook/entercam-departments', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            source: 'entercam_app',
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error(`Ошибка загрузки отделов: ${response.status}`)
+        }
+
+        const data = await response.json()
+        console.log('Departments response:', data)
+
+        const list = normalizeDepartments(data)
+        setDepartments(list)
+      } catch (error) {
+        console.error('Departments error:', error)
+        setDepartmentsError('Не удалось загрузить отделы')
+      } finally {
+        setDepartmentsLoading(false)
+      }
+    }
+
+    loadDepartments()
+  }, [])
 
   const handlePhoneFocus = () => {
     if (!phone) {
@@ -210,14 +269,22 @@ export default function Auth({ onLogin }) {
               <select
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
+                disabled={departmentsLoading}
               >
-                <option value="">Выберите отдел</option>
+                <option value="">
+                  {departmentsLoading ? 'Загрузка отделов...' : 'Выберите отдел'}
+                </option>
+
                 {departments.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
+                  <option key={item.id} value={item.name}>
+                    {item.name}
                   </option>
                 ))}
               </select>
+
+              {departmentsError ? (
+                <div className="auth-error">{departmentsError}</div>
+              ) : null}
             </div>
 
             <button type="submit" className="auth-primary-btn">
