@@ -85,20 +85,16 @@ export default function Auth({ onLogin }) {
 
       const response = await fetch('https://n8n.lpaderina.ru/webhook-test/entercam-departments', {
         method: 'POST',
-        body: JSON.stringify({
-          source: 'entercam_app',
-        }),
-      })
+await fetch('https://n8n.lpaderina.ru/webhook-test/entercam-departments', {
+      method: 'POST',
+      mode: 'no-cors',
+      body: JSON.stringify({
+        source: 'entercam_app',
+        test: true,
+      }),
+    })
 
-      if (!response.ok) {
-        throw new Error(`Ошибка загрузки отделов: ${response.status}`)
-      }
-
-      const data = await response.json()
-      console.log('Departments response:', data)
-
-      const list = normalizeDepartments(data)
-      setDepartments(list)
+    console.log('Запрос отправлен в n8n в режиме no-cors')
     } catch (error) {
       console.error('Departments error:', error)
       setDepartmentsError('Не удалось загрузить отделы')
