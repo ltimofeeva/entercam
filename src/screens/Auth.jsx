@@ -37,21 +37,21 @@ function normalizeDepartments(data) {
 
   if (Array.isArray(data)) {
     return data.map((item) => ({
-      id: item.id || item.uuid || item.name || item.title,
+      id: item.id || item.uuid || item.name || item.title || String(item),
       name: item.name || item.title || item.department || String(item),
     }))
   }
 
   if (Array.isArray(data.departments)) {
     return data.departments.map((item) => ({
-      id: item.id || item.uuid || item.name || item.title,
+      id: item.id || item.uuid || item.name || item.title || String(item),
       name: item.name || item.title || item.department || String(item),
     }))
   }
 
   if (Array.isArray(data.data)) {
     return data.data.map((item) => ({
-      id: item.id || item.uuid || item.name || item.title,
+      id: item.id || item.uuid || item.name || item.title || String(item),
       name: item.name || item.title || item.department || String(item),
     }))
   }
@@ -83,18 +83,16 @@ export default function Auth({ onLogin }) {
       setDepartmentsLoading(true)
       setDepartmentsError('')
 
-      const response = await fetch('https://n8n.lpaderina.ru/webhook-test/entercam-departments', {
+      await fetch('https://n8n.lpaderina.ru/webhook-test/entercam-departments', {
         method: 'POST',
-await fetch('https://n8n.lpaderina.ru/webhook-test/entercam-departments', {
-      method: 'POST',
-      mode: 'no-cors',
-      body: JSON.stringify({
-        source: 'entercam_app',
-        test: true,
-      }),
-    })
+        mode: 'no-cors',
+        body: JSON.stringify({
+          source: 'entercam_app',
+          test: true,
+        }),
+      })
 
-    console.log('Запрос отправлен в n8n в режиме no-cors')
+      console.log('Запрос отправлен в n8n в режиме no-cors')
     } catch (error) {
       console.error('Departments error:', error)
       setDepartmentsError('Не удалось загрузить отделы')
