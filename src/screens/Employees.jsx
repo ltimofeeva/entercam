@@ -3,25 +3,25 @@ import Card from "../components/Card.jsx";
 import Input from "../components/Input.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import { uid } from "../lib/utils.js";
-import { api } from "../lib/api.js";
-import { getTgContext } from "../lib/tg.js";
 
 const ADD_EMPLOYEE_WEBHOOK =
   "https://n8n.lpaderina.ru/webhook/add_employee";
 
-function normalizeApiResponse(raw) {
-  const data = Array.isArray(raw) ? raw[0] : raw;
-  const ok = Boolean(data?.authorized ?? data?.ok ?? data?.result);
+const GET_EMPLOYEES_WEBHOOK =
+  "https://n8n.lpaderina.ru/webhook/get_employee_list";
 
-  const user = data?.user ?? null;
+function normalizeEmployeesResponse(raw, currentUser) {
+  const data = Array.isArray(raw) ? raw[0] : raw;
 
   const employeesRaw =
+    (Array.isArray(raw) && raw) ||
     (Array.isArray(data?.employees) && data.employees) ||
     (Array.isArray(data?.["Сотрудники"]) && data["Сотрудники"]) ||
+    (Array.isArray(data?.data) && data.data) ||
     [];
 
-  const employees = employeesRaw.map((e) => ({
-    id: e.id ?? uid(),
+  return employeesRaw.map((e) => ({
+    id: e.id ?? e.uid ?? uid(),
     name: e.name ?? e.fio ?? e.FIO ?? "",
     phone: e.phone
       ? String(e.phone).startsWith("+")
@@ -29,11 +29,14 @@ function normalizeApiResponse(raw) {
         : `+${String(e.phone)}`
       : "",
     email: e.email ?? "",
-    dept: e.dept ?? e.department ?? user?.department ?? "",
+    dept:
+      e.dept ??
+      e.department ??
+      e.Otdel ??
+      currentUser?.department ??
+      "",
     cars: Array.isArray(e.cars) ? e.cars : [],
   }));
-
-  return { ok, user, employees };
 }
 
 function normalizeCreatedEmployeeResponse(raw, fallback) {
@@ -47,8 +50,12 @@ function normalizeCreatedEmployeeResponse(raw, fallback) {
     data;
 
   return {
-    id: employeeRaw?.id ?? fallback.id,
-    name: employeeRaw?.name ?? employeeRaw?.fio ?? fallback.name,
+    id: employeeRaw?.id ?? employeeRaw?.uid ?? fallback.id,
+    name:
+      employeeRaw?.name ??
+      employeeRaw?.fio ??
+      employeeRaw?.FIO ??
+      fallback.name,
     phone: employeeRaw?.phone
       ? String(employeeRaw.phone).startsWith("+")
         ? String(employeeRaw.phone)
@@ -58,6 +65,7 @@ function normalizeCreatedEmployeeResponse(raw, fallback) {
     dept:
       employeeRaw?.dept ??
       employeeRaw?.department ??
+      employeeRaw?.Otdel ??
       fallback.dept,
     cars: Array.isArray(employeeRaw?.cars) ? employeeRaw.cars : fallback.cars,
   };
@@ -79,7 +87,6 @@ export default function Employees({ state, setState, goEmployee }) {
   });
 
   const [loading, setLoading] = useState(true);
-  const [authorized, setAuthorized] = useState(null);
   const [departmentName, setDepartmentName] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -89,69 +96,70 @@ export default function Employees({ state, setState, goEmployee }) {
   useEffect(() => {
     let cancelled = false;
 
-    (async () => {
+    const loadEmployees = async () => {
       try {
         setLoading(true);
 
-        const ctx = getTgContext();
-        const userId = ctx?.user_id ?? null;
+        const currentUser = state.currentUser ?? null;
 
-        if (!userId) {
-          if (!cancelled) {
-            setAuthorized(false);
-            setLoading(false);
-          }
-          return;
+        const depName = currentUser?.department ?? "";
+        setDepartmentName(depName);
+
+        const response = await fetch(GET_EMPLOYEES_WEBHOOK, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            event: "employees_get",
+            user: currentUser,
+            phone: currentUser?.phone ?? currentUser?.Tel_num ?? "",
+            department: currentUser?.department ?? "",
+            department_id:
+              currentUser?.department_id ??
+              currentUser?.Otdel_id ??
+              "",
+            ts: new Date().toISOString(),
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Webhook error: ${response.status}`);
         }
 
-        const payload = {
-          event: "employee_open",
-          user_id: userId,
-          ts: new Date().toISOString(),
-        };
-
-        const raw = await api.employeeCheck(payload);
-        const { ok, user, employees } = normalizeApiResponse(raw);
+        const raw = await response.json();
+        console.log("Employees webhook response:", raw);
 
         if (cancelled) return;
 
-        if (!ok) {
-          setAuthorized(false);
-          setLoading(false);
-          return;
-        }
-
-        setAuthorized(true);
-
-        const depName =
-          user?.department ??
-          (Array.isArray(raw) ? raw[0] : raw)?.department?.name ??
-          (Array.isArray(raw) ? raw[0] : raw)?.department_name ??
-          (Array.isArray(raw) ? raw[0] : raw)?.dept_name ??
-          "";
-
-        setDepartmentName(depName);
+        const employees = normalizeEmployeesResponse(raw, currentUser);
 
         setState((s) => ({
           ...s,
-          currentUser: user,
           employees,
         }));
-
-        setLoading(false);
       } catch (e) {
-        console.error("employeeCheck error:", e);
+        console.error("loadEmployees error:", e);
+
         if (!cancelled) {
-          setAuthorized(false);
+          setState((s) => ({
+            ...s,
+            employees: s.employees || [],
+          }));
+        }
+      } finally {
+        if (!cancelled) {
           setLoading(false);
         }
       }
-    })();
+    };
+
+    loadEmployees();
 
     return () => {
       cancelled = true;
     };
-  }, [setState]);
+  }, [setState, state.currentUser]);
 
   const list = useMemo(() => {
     const qq = q.trim().toLowerCase();
@@ -195,9 +203,6 @@ export default function Employees({ state, setState, goEmployee }) {
 
     if (hasError) return;
 
-    const ctx = getTgContext();
-    const userId = ctx?.user_id ?? null;
-
     const phoneDigits = form.phone.trim().replace(/\D/g, "");
 
     const draftEmployee = {
@@ -216,7 +221,6 @@ export default function Employees({ state, setState, goEmployee }) {
     const payload = {
       event: "add_employee",
       ts: new Date().toISOString(),
-      user_id: userId,
       current_user: state.currentUser ?? null,
       employee: {
         name: draftEmployee.name,
@@ -264,18 +268,7 @@ export default function Employees({ state, setState, goEmployee }) {
       <div className="content">
         <EmptyState
           title="Загрузка…"
-          hint="Проверяем доступ и получаем сотрудников."
-        />
-      </div>
-    );
-  }
-
-  if (authorized === false) {
-    return (
-      <div className="content">
-        <EmptyState
-          title="Пройдите регистрацию через бота"
-          hint="После регистрации откройте мини-приложение ещё раз."
+          hint="Получаем список сотрудников."
         />
       </div>
     );
@@ -292,7 +285,7 @@ export default function Employees({ state, setState, goEmployee }) {
       {(state.employees || []).length === 0 ? (
         <EmptyState
           title="Сотрудников пока нет"
-          hint="В этом отделе пока нет сотрудников."
+          hint="Список сотрудников пуст."
           action={
             <button
               className="btn primary"
