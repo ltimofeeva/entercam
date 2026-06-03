@@ -37,9 +37,14 @@ function normalizeLoginResponse(data, phone) {
     return null
   }
 
-  if (data.success === false) {
+  if (data.success === false || data.authorized === false) {
     return null
   }
+
+  const employees =
+    (Array.isArray(data.employees) && data.employees) ||
+    (Array.isArray(data['Сотрудники']) && data['Сотрудники']) ||
+    []
 
   if (data.user) {
     return {
@@ -48,7 +53,9 @@ function normalizeLoginResponse(data, phone) {
       name: data.user.name || data.user.fio || phone,
       fio: data.user.fio || data.user.name || phone,
       department: data.user.department || '',
+      department_id: data.user.department_id || '',
       role: data.user.role || '',
+      employees,
     }
   }
 
@@ -59,17 +66,21 @@ function normalizeLoginResponse(data, phone) {
       name: data.employee.name || data.employee.fio || phone,
       fio: data.employee.fio || data.employee.name || phone,
       department: data.employee.department || '',
+      department_id: data.employee.department_id || '',
       role: data.employee.role || '',
+      employees,
     }
   }
 
   return {
-    login: data.phone || phone,
-    phone: data.phone || phone,
-    name: data.name || data.fio || phone,
-    fio: data.fio || data.name || phone,
-    department: data.department || '',
+    login: data.phone || data.Tel_num || phone,
+    phone: data.phone || data.Tel_num || phone,
+    name: data.name || data.fio || data.FIO || phone,
+    fio: data.fio || data.FIO || data.name || phone,
+    department: data.department || data.Otdel || '',
+    department_id: data.department_id || data.Otdel_id || '',
     role: data.role || '',
+    employees,
   }
 }
 
@@ -208,15 +219,15 @@ export default function Auth({ onLogin }) {
       const data = await response.json()
       console.log('Login response:', data)
 
-      if (data.success === false) {
-        alert(data.message || 'Пользователь не найден')
+      if (data.success === false || data.authorized === false) {
+        alert(data.message || 'Пользователь не найден. Пройдите регистрацию.')
         return
       }
 
       const userData = normalizeLoginResponse(data, loginPhone)
 
       if (!userData) {
-        alert('Пользователь не найден')
+        alert('Пользователь не найден. Пройдите регистрацию.')
         return
       }
 
