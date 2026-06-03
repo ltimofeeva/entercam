@@ -116,41 +116,42 @@ export default function Auth({ onLogin }) {
   const [departmentsError, setDepartmentsError] = useState('')
 
   useEffect(() => {
-    const loadDepartments = async () => {
-      try {
-        setDepartmentsLoading(true)
-        setDepartmentsError('')
+  const loadDepartments = async () => {
+    try {
+      setDepartmentsLoading(true)
+      setDepartmentsError('')
 
-        const response = await fetch(
-          'https://n8n.lpaderina.ru/webhook-test/entercam-departments', {
-          method: "POST",
+      const response = await fetch(
+        'https://n8n.lpaderina.ru/webhook/entercam-departments',
+        {
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
-          body: JSON.stringify(payload),
-        });
-        )
-
-        if (!response.ok) {
-          throw new Error(`Ошибка сервера: ${response.status}`)
+          body: JSON.stringify({}),
         }
+      )
 
-        const data = await response.json()
-        console.log('Departments response:', data)
-
-        const normalizedDepartments = normalizeDepartmentsResponse(data)
-
-        setDepartments(normalizedDepartments)
-      } catch (error) {
-        console.error('Departments loading error:', error)
-        setDepartmentsError('Не удалось загрузить отделы')
-      } finally {
-        setDepartmentsLoading(false)
+      if (!response.ok) {
+        throw new Error(`Ошибка сервера: ${response.status}`)
       }
-    }
 
-    loadDepartments()
-  }, [])
+      const data = await response.json()
+      console.log('Departments response:', data)
+
+      const normalizedDepartments = normalizeDepartmentsResponse(data)
+
+      setDepartments(normalizedDepartments)
+    } catch (error) {
+      console.error('Departments loading error:', error)
+      setDepartmentsError('Не удалось загрузить отделы')
+    } finally {
+      setDepartmentsLoading(false)
+    }
+  }
+
+  loadDepartments()
+}, [])
 
   const openLoginTab = () => {
     setTab('login')
