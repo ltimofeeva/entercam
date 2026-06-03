@@ -4,16 +4,12 @@ import BottomNav from "./components/BottomNav.jsx";
 import Employees from "./screens/Employees.jsx";
 import EmployeeDetail from "./screens/EmployeeDetail.jsx";
 import Guests from "./screens/Guests.jsx";
+import Auth from "./screens/Auth.jsx";
 import { initTg, haptic, showAlert } from "./lib/tg.js";
 import { loadState, saveState } from "./lib/storage.js";
 import { normPlate } from "./lib/utils.js";
 import { api } from "./lib/api.js";
-import Auth from './screens/Auth'
-import './styles.css'
-
-export default function App() {
-  return <Auth />
-}
+import "./styles.css";
 
 function normalizeGuestResponse(raw) {
   if (!raw) return [];
@@ -54,6 +50,9 @@ function normalizeGuestResponse(raw) {
 }
 
 export default function App() {
+  const [isAuth, setIsAuth] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
   const [state, setState] = useState(() => ({
     ...loadState(),
     guests: loadState()?.guests || [],
@@ -63,10 +62,39 @@ export default function App() {
   const [view, setView] = useState({ name: "tab", employeeId: null });
   const [guestsLoading, setGuestsLoading] = useState(false);
 
-  useEffect(() => initTg(), []);
-  useEffect(() => saveState(state), [state]);
+  useEffect(() => {
+    initTg();
+
+    const savedAuth = localStorage.getItem("entercam_auth");
+    const savedUser = localStorage.getItem("entercam_user");
+
+    if (savedAuth === "true" && savedUser) {
+      setIsAuth(true);
+
+      try {
+        const user = JSON.parse(savedUser);
+
+        setState((s) => ({
+          ...s,
+          currentUser: user,
+        }));
+      } catch (error) {
+        localStorage.removeItem("entercam_auth");
+        localStorage.removeItem("entercam_user");
+      }
+    }
+
+    setCheckingAuth(false);
+  }, []);
 
   useEffect(() => {
+    if (isAuth) {
+      saveState(state);
+    }
+  }, [state, isAuth]);
+
+  useEffect(() => {
+    if (!isAuth) return;
     if (tab !== "guests") return;
 
     const loadGuests = async () => {
@@ -106,7 +134,33 @@ export default function App() {
     };
 
     loadGuests();
-  }, [tab, state.currentUser]);
+  }, [tab, state.currentUser, isAuth]);
+
+  const handleLogin = (userData) => {
+    localStorage.setItem("entercam_auth", "true");
+    localStorage.setItem("entercam_user", JSON.stringify(userData));
+
+    setState((s) => ({
+      ...s,
+      currentUser: userData,
+    }));
+
+    setIsAuth(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("entercam_auth");
+    localStorage.removeItem("entercam_user");
+
+    setState((s) => ({
+      ...s,
+      currentUser: null,
+    }));
+
+    setIsAuth(false);
+    setTab("employees");
+    setView({ name: "tab", employeeId: null });
+  };
 
   const title = useMemo(() => {
     if (view.name === "employee") return "Сотрудник";
@@ -118,8 +172,8 @@ export default function App() {
   const subtitle = useMemo(() => {
     if (tab === "employees" && state.currentUser) {
       return {
-        fio: state.currentUser.fio,
-        department: state.currentUser.department,
+        fio: state.currentUser.fio || state.currentUser.name || state.currentUser.login,
+        department: state.currentUser.department || "",
       };
     }
 
@@ -156,12 +210,37 @@ export default function App() {
 
   const left =
     view.name === "employee" ? (
-      <button className="btn ghost" onClick={onBack}>←</button>
+      <button className="btn ghost" onClick={onBack}>
+        ←
+      </button>
     ) : null;
+
+  if (checkingAuth) {
+    return (
+      <div className="auth-screen">
+        <div className="auth-card">
+          <div className="big">Загрузка...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuth) {
+    return <Auth onLogin={handleLogin} />;
+  }
 
   return (
     <div className="app">
-      <Header title={title} subtitle={subtitle} left={left} />
+      <Header
+        title={title}
+        subtitle={subtitle}
+        left={left}
+        right={
+          <button className="btn ghost" onClick={handleLogout}>
+            Выйти
+          </button>
+        }
+      />
 
       {view.name === "employee" ? (
         <EmployeeDetail
