@@ -89,7 +89,6 @@ export default function Auth({ onLogin }) {
   const [tab, setTab] = useState('login')
 
   const [loginPhone, setLoginPhone] = useState('')
-  const [password, setPassword] = useState('')
   const [loginLoading, setLoginLoading] = useState(false)
 
   const [fullName, setFullName] = useState('')
@@ -189,11 +188,6 @@ export default function Auth({ onLogin }) {
       return
     }
 
-    if (!password.trim()) {
-      alert('Введите пароль')
-      return
-    }
-
     try {
       setLoginLoading(true)
 
@@ -204,7 +198,6 @@ export default function Auth({ onLogin }) {
         },
         body: JSON.stringify({
           phone: loginPhone,
-          password: password.trim(),
         }),
       })
 
@@ -216,14 +209,14 @@ export default function Auth({ onLogin }) {
       console.log('Login response:', data)
 
       if (data.success === false) {
-        alert(data.message || 'Неверный номер телефона или пароль')
+        alert(data.message || 'Пользователь не найден')
         return
       }
 
       const userData = normalizeLoginResponse(data, loginPhone)
 
       if (!userData) {
-        alert('Неверный номер телефона или пароль')
+        alert('Пользователь не найден')
         return
       }
 
@@ -277,11 +270,11 @@ export default function Auth({ onLogin }) {
       console.log('Register response:', data)
 
       if (data.success === false) {
-        alert(data.message || 'Не удалось отправить заявку')
+        alert(data.message || 'Не удалось добавить сотрудника')
         return
       }
 
-      alert('Заявка на регистрацию отправлена')
+      alert('Сотрудник добавлен')
 
       setFullName('')
       setPhone('')
@@ -289,7 +282,7 @@ export default function Auth({ onLogin }) {
       setTab('login')
     } catch (error) {
       console.error('Register error:', error)
-      alert('Не удалось отправить заявку. Проверьте подключение или настройки n8n.')
+      alert('Не удалось добавить сотрудника. Проверьте подключение или настройки n8n.')
     } finally {
       setRegisterLoading(false)
     }
@@ -301,7 +294,7 @@ export default function Auth({ onLogin }) {
         <div className="auth-header">
           <h1 className="auth-title">Добро пожаловать</h1>
           <p className="auth-subtitle">
-            Войдите в приложение или оставьте заявку на регистрацию
+            Войдите в приложение или добавьте нового сотрудника
           </p>
         </div>
 
@@ -339,31 +332,12 @@ export default function Auth({ onLogin }) {
               />
             </div>
 
-            <div className="auth-field">
-              <label>Пароль</label>
-              <input
-                type="password"
-                placeholder="Введите пароль"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-              />
-            </div>
-
             <button
               type="submit"
               className="auth-primary-btn"
               disabled={loginLoading}
             >
               {loginLoading ? 'Входим...' : 'Войти'}
-            </button>
-
-            <button
-              type="button"
-              className="auth-link-btn"
-              onClick={() => alert('Восстановление пароля подключим следующим шагом')}
-            >
-              Забыли пароль?
             </button>
           </form>
         ) : (
@@ -421,7 +395,7 @@ export default function Auth({ onLogin }) {
               className="auth-primary-btn"
               disabled={registerLoading}
             >
-              {registerLoading ? 'Отправляем...' : 'Отправить заявку'}
+              {registerLoading ? 'Добавляем...' : 'Добавить сотрудника'}
             </button>
           </form>
         )}
