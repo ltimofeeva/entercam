@@ -628,6 +628,13 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
         />
 
         <div>
+        
+
+          <Input
+            label="Телефон"
+            value={formatPhone(emp.phone)}
+            disabled
+          />
           <div
             className="muted"
             style={{
@@ -639,12 +646,6 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
           >
             Номер телефона изменить нельзя
           </div>
-
-          <Input
-            label="Телефон"
-            value={formatPhone(emp.phone)}
-            disabled
-          />
         </div>
 
         <Input
