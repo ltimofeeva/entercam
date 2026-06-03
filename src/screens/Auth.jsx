@@ -83,7 +83,7 @@ export default function Auth({ onLogin }) {
       setDepartmentsLoading(true)
       setDepartmentsError('')
 
-      await fetch('https://n8n.lpaderina.ru/webhook-test/entercam-departments', {
+      await fetch('https://n8n.lpaderina.ru/webhook/entercam-departments', {
         method: 'POST',
         mode: 'no-cors',
         body: JSON.stringify({
