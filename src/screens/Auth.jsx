@@ -79,7 +79,7 @@ export default function Auth({ onLogin }) {
         setDepartmentsLoading(true)
         setDepartmentsError('')
 
-        const response = await fetch('https://n8n.lpaderina.ru/webhook/entercam-departments', {
+        const response = await fetch('https://n8n.lpaderina.ru/webhook-test/entercam-departments', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
