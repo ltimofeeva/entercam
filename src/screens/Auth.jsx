@@ -95,6 +95,7 @@ export default function Auth({ onLogin }) {
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [department, setDepartment] = useState('')
+  const [registerLoading, setRegisterLoading] = useState(false)
 
   const [departments, setDepartments] = useState([])
   const [departmentsLoading, setDepartmentsLoading] = useState(false)
@@ -254,7 +255,9 @@ export default function Auth({ onLogin }) {
     }
 
     try {
-      const response = await fetch('https://n8n.lpaderina.ru/webhook/entercam-register', {
+      setRegisterLoading(true)
+
+      const response = await fetch('https://n8n.lpaderina.ru/webhook/add_employee', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -287,6 +290,8 @@ export default function Auth({ onLogin }) {
     } catch (error) {
       console.error('Register error:', error)
       alert('Не удалось отправить заявку. Проверьте подключение или настройки n8n.')
+    } finally {
+      setRegisterLoading(false)
     }
   }
 
@@ -411,8 +416,12 @@ export default function Auth({ onLogin }) {
               ) : null}
             </div>
 
-            <button type="submit" className="auth-primary-btn">
-              Отправить заявку
+            <button
+              type="submit"
+              className="auth-primary-btn"
+              disabled={registerLoading}
+            >
+              {registerLoading ? 'Отправляем...' : 'Отправить заявку'}
             </button>
           </form>
         )}
