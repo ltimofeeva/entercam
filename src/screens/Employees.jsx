@@ -110,7 +110,7 @@ function normalizeCreatedEmployeeResponse(raw, fallback) {
 function isValidPhone(value) {
   const digits = normalizePhoneDigits(value);
 
-  return /^79\d{9}$/.test(digits);
+  return /^7\d{9}$/.test(digits);
 }
 
 export default function Employees({ state, setState, goEmployee }) {
