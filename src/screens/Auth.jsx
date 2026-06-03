@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 function formatPhone(value) {
   let digits = value.replace(/\D/g, '')
@@ -73,41 +73,48 @@ export default function Auth({ onLogin }) {
   const [departmentsLoading, setDepartmentsLoading] = useState(false)
   const [departmentsError, setDepartmentsError] = useState('')
 
-  useEffect(() => {
-    const loadDepartments = async () => {
-      try {
-        setDepartmentsLoading(true)
-        setDepartmentsError('')
+  const loadDepartments = async () => {
+    try {
+      if (departmentsLoading) return
 
-        const response = await fetch('https://n8n.lpaderina.ru/webhook-test/entercam-departments', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            source: 'entercam_app',
-          }),
-        })
+      setDepartmentsLoading(true)
+      setDepartmentsError('')
 
-        if (!response.ok) {
-          throw new Error(`Ошибка загрузки отделов: ${response.status}`)
-        }
+      const response = await fetch('https://n8n.lpaderina.ru/webhook-test/entercam-departments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          source: 'entercam_app',
+        }),
+      })
 
-        const data = await response.json()
-        console.log('Departments response:', data)
-
-        const list = normalizeDepartments(data)
-        setDepartments(list)
-      } catch (error) {
-        console.error('Departments error:', error)
-        setDepartmentsError('Не удалось загрузить отделы')
-      } finally {
-        setDepartmentsLoading(false)
+      if (!response.ok) {
+        throw new Error(`Ошибка загрузки отделов: ${response.status}`)
       }
-    }
 
+      const data = await response.json()
+      console.log('Departments response:', data)
+
+      const list = normalizeDepartments(data)
+      setDepartments(list)
+    } catch (error) {
+      console.error('Departments error:', error)
+      setDepartmentsError('Не удалось загрузить отделы')
+    } finally {
+      setDepartmentsLoading(false)
+    }
+  }
+
+  const openLoginTab = () => {
+    setTab('login')
+  }
+
+  const openRegisterTab = () => {
+    setTab('register')
     loadDepartments()
-  }, [])
+  }
 
   const handlePhoneFocus = () => {
     if (!phone) {
@@ -187,7 +194,7 @@ export default function Auth({ onLogin }) {
           <button
             type="button"
             className={`auth-tab ${tab === 'login' ? 'active' : ''}`}
-            onClick={() => setTab('login')}
+            onClick={openLoginTab}
           >
             Авторизация
           </button>
@@ -195,7 +202,7 @@ export default function Auth({ onLogin }) {
           <button
             type="button"
             className={`auth-tab ${tab === 'register' ? 'active' : ''}`}
-            onClick={() => setTab('register')}
+            onClick={openRegisterTab}
           >
             Регистрация
           </button>
