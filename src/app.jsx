@@ -5,31 +5,68 @@ import Employees from "./screens/Employees.jsx";
 import EmployeeDetail from "./screens/EmployeeDetail.jsx";
 import Guests from "./screens/Guests.jsx";
 import Auth from "./screens/Auth.jsx";
-import { initTg, haptic, showAlert } from "./lib/tg.js";
+import { initTg, haptic } from "./lib/tg.js";
 import { loadState, saveState } from "./lib/storage.js";
 import { normPlate } from "./lib/utils.js";
 import { api } from "./lib/api.js";
 import "./styles.css";
 
+function safeAlert(message) {
+  window.alert(message);
+}
+
+async function readJsonSafe(res, fallback = []) {
+  const text = await res.text();
+
+  if (!text || !text.trim()) {
+    return fallback;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    console.error("JSON parse error:", error, "Response text:", text);
+    return fallback;
+  }
+}
+
 function normalizeGuestResponse(raw) {
   if (!raw) return [];
 
   if (Array.isArray(raw)) {
-    return raw.flatMap((item) =>
-      Array.isArray(item?.guests)
-        ? item.guests.map((guest) => ({
-            id: guest.id || crypto.randomUUID(),
-            fio: guest.fio || guest.name || "",
-            name: guest.fio || guest.name || "",
-            plate: guest.plate || "",
-            entryDate: guest.entryDate || "",
-            entryTime: guest.entryTime || "",
-            exitDate: guest.exitDate || "",
-            exitTime: guest.exitTime || "",
-            type: guest.type || "car_number",
-          }))
-        : []
-    );
+    return raw.flatMap((item) => {
+      if (Array.isArray(item?.guests)) {
+        return item.guests.map((guest) => ({
+          id: guest.id || crypto.randomUUID(),
+          fio: guest.fio || guest.name || "",
+          name: guest.fio || guest.name || "",
+          plate: guest.plate || "",
+          entryDate: guest.entryDate || "",
+          entryTime: guest.entryTime || "",
+          exitDate: guest.exitDate || "",
+          exitTime: guest.exitTime || "",
+          type: guest.type || "car_number",
+        }));
+      }
+
+      if (item?.plate) {
+        return [
+          {
+            id: item.id || crypto.randomUUID(),
+            fio: item.fio || item.name || "",
+            name: item.fio || item.name || "",
+            plate: item.plate || "",
+            entryDate: item.entryDate || "",
+            entryTime: item.entryTime || "",
+            exitDate: item.exitDate || "",
+            exitTime: item.exitTime || "",
+            type: item.type || "car_number",
+          },
+        ];
+      }
+
+      return [];
+    });
   }
 
   if (Array.isArray(raw?.guests)) {
@@ -46,6 +83,20 @@ function normalizeGuestResponse(raw) {
     }));
   }
 
+  if (Array.isArray(raw?.data)) {
+    return raw.data.map((guest) => ({
+      id: guest.id || guest.uid || crypto.randomUUID(),
+      fio: guest.fio || guest.name || "",
+      name: guest.fio || guest.name || "",
+      plate: guest.plate || guest.car_number || guest.number || "",
+      entryDate: guest.entryDate || guest.entry_date || "",
+      entryTime: guest.entryTime || guest.entry_time || "",
+      exitDate: guest.exitDate || guest.exit_date || "",
+      exitTime: guest.exitTime || guest.exit_time || "",
+      type: guest.type || "car_number",
+    }));
+  }
+
   return [];
 }
 
@@ -53,12 +104,16 @@ export default function App() {
   const [isAuth, setIsAuth] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
 
-  const [state, setState] = useState(() => ({
-    ...loadState(),
-    guests: loadState()?.guests || [],
-  }));
+  const [state, setState] = useState(() => {
+    const savedState = loadState();
 
-  const [tab, setTab] = useState("employees"); // employees | guests
+    return {
+      ...savedState,
+      guests: [],
+    };
+  });
+
+  const [tab, setTab] = useState("employees");
   const [view, setView] = useState({ name: "tab", employeeId: null });
   const [guestsLoading, setGuestsLoading] = useState(false);
 
@@ -77,6 +132,7 @@ export default function App() {
         setState((s) => ({
           ...s,
           currentUser: user,
+          guests: [],
         }));
       } catch (error) {
         localStorage.removeItem("entercam_auth");
@@ -89,7 +145,10 @@ export default function App() {
 
   useEffect(() => {
     if (isAuth) {
-      saveState(state);
+      saveState({
+        ...state,
+        guests: [],
+      });
     }
   }, [state, isAuth]);
 
@@ -115,7 +174,7 @@ export default function App() {
           throw new Error(`HTTP ${res.status}`);
         }
 
-        const data = await res.json();
+        const data = await readJsonSafe(res, []);
         console.log("Guests webhook response:", data);
 
         const guests = normalizeGuestResponse(data);
@@ -127,7 +186,13 @@ export default function App() {
         }));
       } catch (err) {
         console.error("Guests webhook error:", err);
-        showAlert("Не удалось загрузить список гостей");
+
+        setState((s) => ({
+          ...s,
+          guests: [],
+        }));
+
+        safeAlert("Не удалось загрузить список гостей");
       } finally {
         setGuestsLoading(false);
       }
@@ -143,6 +208,10 @@ export default function App() {
     setState((s) => ({
       ...s,
       currentUser: userData,
+      employees: Array.isArray(userData.employees)
+        ? userData.employees
+        : s.employees || [],
+      guests: [],
     }));
 
     setIsAuth(true);
@@ -155,6 +224,8 @@ export default function App() {
     setState((s) => ({
       ...s,
       currentUser: null,
+      employees: [],
+      guests: [],
     }));
 
     setIsAuth(false);
@@ -172,13 +243,16 @@ export default function App() {
   const subtitle = useMemo(() => {
     if (tab === "employees" && state.currentUser) {
       return {
-        fio: state.currentUser.fio || state.currentUser.name || state.currentUser.login,
+        fio:
+          state.currentUser.fio ||
+          state.currentUser.name ||
+          state.currentUser.login,
         department: state.currentUser.department || "",
       };
     }
 
     if (view.name === "employee") {
-      const e = state.employees.find((x) => x.id === view.employeeId);
+      const e = state.employees?.find((x) => x.id === view.employeeId);
       return e?.phone ? { single: e.phone } : null;
     }
 
@@ -195,16 +269,21 @@ export default function App() {
 
   async function allowExit(plateRaw) {
     const plate = normPlate(plateRaw);
+
     try {
       haptic("impact", "medium");
+
       const res = await api.allowExitByPlate(plate);
-      if (!res.ok) throw new Error("API error");
+
+      if (!res.ok) {
+        throw new Error("API error");
+      }
 
       haptic("notify", "success");
-      showAlert(`Выезд разрешён: ${plate}`);
+      safeAlert(`Выезд разрешён: ${plate}`);
     } catch (e) {
       haptic("notify", "error");
-      showAlert(`Не удалось разрешить выезд: ${plate}`);
+      safeAlert(`Не удалось разрешить выезд: ${plate}`);
     }
   }
 
@@ -252,7 +331,11 @@ export default function App() {
       ) : (
         <>
           {tab === "employees" ? (
-            <Employees state={state} setState={setState} goEmployee={goEmployee} />
+            <Employees
+              state={state}
+              setState={setState}
+              goEmployee={goEmployee}
+            />
           ) : null}
 
           {tab === "guests" ? (
@@ -266,7 +349,11 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <Guests state={state} setState={setState} allowExit={allowExit} />
+              <Guests
+                state={state}
+                setState={setState}
+                allowExit={allowExit}
+              />
             )
           ) : null}
         </>
