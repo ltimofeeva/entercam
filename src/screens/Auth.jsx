@@ -77,6 +77,9 @@ export default function Auth({ onLogin }) {
     try {
       if (departmentsLoading) return
 
+      alert('Клик по регистрации: отправляю запрос в n8n')
+      console.log('START loadDepartments')
+
       setDepartmentsLoading(true)
       setDepartmentsError('')
 
