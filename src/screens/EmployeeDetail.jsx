@@ -626,7 +626,18 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
             setEditForm((f) => ({ ...f, name: e.target.value }))
           }
         />
-
+<div>
+  <div
+    className="muted"
+    style={{
+      marginBottom: 6,
+      fontSize: 13,
+      color: "#dc2626",
+      fontWeight: 700,
+    }}
+  >
+    Номер телефона изменить нельзя
+  </div>
         <Input
           label="Телефон"
           value={formatPhone(emp.phone)}
