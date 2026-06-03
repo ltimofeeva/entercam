@@ -1,12 +1,4 @@
-import { useState } from 'react'
-
-const departments = [
-  'Администрация',
-  'Отдел продаж',
-  'Охрана',
-  'Склад',
-  'Бухгалтерия',
-]
+import { useEffect, useState } from 'react'
 
 function formatPhone(value) {
   let digits = value.replace(/\D/g, '')
@@ -81,6 +73,33 @@ function normalizeLoginResponse(data, phone) {
   }
 }
 
+function normalizeDepartmentsResponse(data) {
+  if (!data) {
+    return []
+  }
+
+  const list = Array.isArray(data) ? data : data.departments || data.items || []
+
+  return list
+    .map((item) => {
+      if (typeof item === 'string') {
+        return item
+      }
+
+      return (
+        item.name ||
+        item.Name ||
+        item.department ||
+        item.Department ||
+        item.Otdel ||
+        item.otdel ||
+        item.title ||
+        ''
+      )
+    })
+    .filter(Boolean)
+}
+
 export default function Auth({ onLogin }) {
   const [tab, setTab] = useState('login')
 
@@ -91,6 +110,41 @@ export default function Auth({ onLogin }) {
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [department, setDepartment] = useState('')
+
+  const [departments, setDepartments] = useState([])
+  const [departmentsLoading, setDepartmentsLoading] = useState(false)
+  const [departmentsError, setDepartmentsError] = useState('')
+
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        setDepartmentsLoading(true)
+        setDepartmentsError('')
+
+        const response = await fetch(
+          'https://n8n.lpaderina.ru/webhook/entercam-departments'
+        )
+
+        if (!response.ok) {
+          throw new Error(`Ошибка сервера: ${response.status}`)
+        }
+
+        const data = await response.json()
+        console.log('Departments response:', data)
+
+        const normalizedDepartments = normalizeDepartmentsResponse(data)
+
+        setDepartments(normalizedDepartments)
+      } catch (error) {
+        console.error('Departments loading error:', error)
+        setDepartmentsError('Не удалось загрузить отделы')
+      } finally {
+        setDepartmentsLoading(false)
+      }
+    }
+
+    loadDepartments()
+  }, [])
 
   const openLoginTab = () => {
     setTab('login')
@@ -321,8 +375,11 @@ export default function Auth({ onLogin }) {
               <select
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
+                disabled={departmentsLoading}
               >
-                <option value="">Выберите отдел</option>
+                <option value="">
+                  {departmentsLoading ? 'Загрузка отделов...' : 'Выберите отдел'}
+                </option>
 
                 {departments.map((item) => (
                   <option key={item} value={item}>
@@ -330,6 +387,10 @@ export default function Auth({ onLogin }) {
                   </option>
                 ))}
               </select>
+
+              {departmentsError ? (
+                <p className="auth-error">{departmentsError}</p>
+              ) : null}
             </div>
 
             <button type="submit" className="auth-primary-btn">
