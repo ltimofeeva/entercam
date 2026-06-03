@@ -10,6 +10,42 @@ const ADD_EMPLOYEE_WEBHOOK =
 const GET_EMPLOYEES_WEBHOOK =
   "https://n8n.lpaderina.ru/webhook/get_employee_list";
 
+function formatPhone(value) {
+  let digits = String(value || "").replace(/\D/g, "");
+
+  if (!digits) return "";
+
+  if (digits[0] === "8") {
+    digits = "7" + digits.slice(1);
+  }
+
+  if (digits[0] !== "7") {
+    digits = "7" + digits;
+  }
+
+  digits = digits.slice(0, 11);
+
+  const country = "+7";
+  const p1 = digits.slice(1, 4);
+  const p2 = digits.slice(4, 7);
+  const p3 = digits.slice(7, 9);
+  const p4 = digits.slice(9, 11);
+
+  let result = country;
+
+  if (p1) result += ` (${p1}`;
+  if (p1.length === 3) result += ")";
+  if (p2) result += ` ${p2}`;
+  if (p3) result += `-${p3}`;
+  if (p4) result += `-${p4}`;
+
+  return result;
+}
+
+function normalizePhoneDigits(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
 function normalizeEmployeesResponse(raw, currentUser) {
   const data = Array.isArray(raw) ? raw[0] : raw;
 
@@ -72,8 +108,9 @@ function normalizeCreatedEmployeeResponse(raw, fallback) {
 }
 
 function isValidPhone(value) {
-  const digits = String(value || "").replace(/\D/g, "");
-  return /^9\d{9}$/.test(digits);
+  const digits = normalizePhoneDigits(value);
+
+  return /^79\d{9}$/.test(digits);
 }
 
 export default function Employees({ state, setState, goEmployee }) {
@@ -176,7 +213,7 @@ export default function Employees({ state, setState, goEmployee }) {
       name: "",
       phone: "",
       email: "",
-      dept: "",
+      dept: departmentName || state.currentUser?.department || "",
     });
     setNameError("");
     setPhoneError("");
@@ -195,7 +232,7 @@ export default function Employees({ state, setState, goEmployee }) {
     }
 
     if (!form.phone.trim() || !isValidPhone(form.phone)) {
-      setPhoneError("Введите номер телефона начиная с 9");
+      setPhoneError("Введите номер телефона полностью");
       hasError = true;
     } else {
       setPhoneError("");
@@ -203,18 +240,14 @@ export default function Employees({ state, setState, goEmployee }) {
 
     if (hasError) return;
 
-    const phoneDigits = form.phone.trim().replace(/\D/g, "");
+    const phoneDigits = normalizePhoneDigits(form.phone);
 
     const draftEmployee = {
       id: uid(),
       name: form.name.trim(),
       phone: phoneDigits,
       email: form.email.trim(),
-      dept:
-        form.dept.trim() ||
-        departmentName ||
-        state.currentUser?.department ||
-        "",
+      dept: departmentName || state.currentUser?.department || "",
       cars: [],
     };
 
@@ -306,7 +339,7 @@ export default function Employees({ state, setState, goEmployee }) {
             <div className="row">
               <div className="col">
                 <div className="big">{e.name || "Без имени"}</div>
-                {e.phone ? <div className="muted">{e.phone}</div> : null}
+                {e.phone ? <div className="muted">{formatPhone(e.phone)}</div> : null}
                 {e.email ? <div className="muted">{e.email}</div> : null}
                 <div className="muted">Отдел: {e.dept || "Не указан"}</div>
               </div>
@@ -361,11 +394,24 @@ export default function Employees({ state, setState, goEmployee }) {
               <div>
                 <Input
                   label="Телефон*"
-                  placeholder="9512244555"
+                  placeholder="+7 (___) ___-__-__"
                   value={form.phone}
+                  onFocus={() => {
+                    if (!form.phone) {
+                      setForm((f) => ({ ...f, phone: "+7" }));
+                    }
+                  }}
                   onChange={(e) => {
-                    setForm({ ...form, phone: e.target.value });
+                    setForm((f) => ({
+                      ...f,
+                      phone: formatPhone(e.target.value),
+                    }));
                     if (phoneError) setPhoneError("");
+                  }}
+                  onBlur={() => {
+                    if (form.phone === "+7") {
+                      setForm((f) => ({ ...f, phone: "" }));
+                    }
                   }}
                 />
                 {phoneError ? (
@@ -389,15 +435,8 @@ export default function Employees({ state, setState, goEmployee }) {
 
               <Input
                 label="Отдел"
-                value={form.dept}
-                onChange={(e) => setForm({ ...form, dept: e.target.value })}
-                placeholder={
-                  departmentName || state.currentUser?.department
-                    ? `По умолчанию: ${
-                        departmentName || state.currentUser?.department
-                      }`
-                    : ""
-                }
+                value={form.dept || departmentName || state.currentUser?.department || ""}
+                disabled
               />
             </div>
 
