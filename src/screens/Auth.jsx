@@ -40,11 +40,53 @@ function formatPhone(value) {
   return result
 }
 
+function normalizeLoginResponse(data, phone) {
+  if (!data) {
+    return null
+  }
+
+  if (data.success === false) {
+    return null
+  }
+
+  if (data.user) {
+    return {
+      login: data.user.phone || phone,
+      phone: data.user.phone || phone,
+      name: data.user.name || data.user.fio || phone,
+      fio: data.user.fio || data.user.name || phone,
+      department: data.user.department || '',
+      role: data.user.role || '',
+    }
+  }
+
+  if (data.employee) {
+    return {
+      login: data.employee.phone || phone,
+      phone: data.employee.phone || phone,
+      name: data.employee.name || data.employee.fio || phone,
+      fio: data.employee.fio || data.employee.name || phone,
+      department: data.employee.department || '',
+      role: data.employee.role || '',
+    }
+  }
+
+  return {
+    login: data.phone || phone,
+    phone: data.phone || phone,
+    name: data.name || data.fio || phone,
+    fio: data.fio || data.name || phone,
+    department: data.department || '',
+    role: data.role || '',
+  }
+}
+
 export default function Auth({ onLogin }) {
   const [tab, setTab] = useState('login')
 
   const [loginPhone, setLoginPhone] = useState('')
   const [password, setPassword] = useState('')
+  const [loginLoading, setLoginLoading] = useState(false)
 
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
@@ -92,7 +134,7 @@ export default function Auth({ onLogin }) {
     }
   }
 
-  const handleLoginSubmit = (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault()
 
     if (!loginPhone || loginPhone.length < 18) {
@@ -105,15 +147,46 @@ export default function Auth({ onLogin }) {
       return
     }
 
-    const userData = {
-      login: loginPhone,
-      phone: loginPhone,
-      name: loginPhone,
-      fio: loginPhone,
-      department: '',
-    }
+    try {
+      setLoginLoading(true)
 
-    onLogin(userData)
+      const response = await fetch('https://n8n.lpaderina.ru/webhook/employee', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone: loginPhone,
+          password: password.trim(),
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Ошибка сервера: ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log('Login response:', data)
+
+      if (data.success === false) {
+        alert(data.message || 'Неверный номер телефона или пароль')
+        return
+      }
+
+      const userData = normalizeLoginResponse(data, loginPhone)
+
+      if (!userData) {
+        alert('Неверный номер телефона или пароль')
+        return
+      }
+
+      onLogin(userData)
+    } catch (error) {
+      console.error('Login error:', error)
+      alert('Не удалось выполнить вход. Проверьте подключение или настройки n8n.')
+    } finally {
+      setLoginLoading(false)
+    }
   }
 
   const handleRegisterSubmit = (e) => {
@@ -200,8 +273,12 @@ export default function Auth({ onLogin }) {
               />
             </div>
 
-            <button type="submit" className="auth-primary-btn">
-              Войти
+            <button
+              type="submit"
+              className="auth-primary-btn"
+              disabled={loginLoading}
+            >
+              {loginLoading ? 'Входим...' : 'Войти'}
             </button>
 
             <button
