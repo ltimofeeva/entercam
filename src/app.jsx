@@ -241,7 +241,7 @@ export default function App() {
   }, [tab, view.name]);
 
   const subtitle = useMemo(() => {
-    if (tab === "employees" && state.currentUser) {
+    if ((tab === "employees" || tab === "guests") && state.currentUser) {
       return {
         fio:
           state.currentUser.fio ||
