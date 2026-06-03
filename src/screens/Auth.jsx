@@ -406,7 +406,7 @@ export default function Auth({ onLogin }) {
               className="auth-primary-btn"
               disabled={registerLoading}
             >
-              {registerLoading ? 'Добавляем...' : 'Добавить сотрудника'}
+              {registerLoading ? 'Идет регистрация...' : 'Зарегистрироваться'}
             </button>
           </form>
         )}
