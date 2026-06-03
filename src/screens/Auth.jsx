@@ -78,25 +78,10 @@ function normalizeDepartmentsResponse(data) {
     return []
   }
 
-  const list = Array.isArray(data) ? data : data.departments || data.items || []
+  const list = Array.isArray(data) ? data : []
 
   return list
-    .map((item) => {
-      if (typeof item === 'string') {
-        return item
-      }
-
-      return (
-        item.name ||
-        item.Name ||
-        item.department ||
-        item.Department ||
-        item.Otdel ||
-        item.otdel ||
-        item.title ||
-        ''
-      )
-    })
+    .map((item) => item.name)
     .filter(Boolean)
 }
 
@@ -116,42 +101,42 @@ export default function Auth({ onLogin }) {
   const [departmentsError, setDepartmentsError] = useState('')
 
   useEffect(() => {
-  const loadDepartments = async () => {
-    try {
-      setDepartmentsLoading(true)
-      setDepartmentsError('')
+    const loadDepartments = async () => {
+      try {
+        setDepartmentsLoading(true)
+        setDepartmentsError('')
 
-      const response = await fetch(
-        'https://n8n.lpaderina.ru/webhook/entercam-departments',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({}),
+        const response = await fetch(
+          'https://n8n.lpaderina.ru/webhook/entercam-departments',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          }
+        )
+
+        if (!response.ok) {
+          throw new Error(`Ошибка сервера: ${response.status}`)
         }
-      )
 
-      if (!response.ok) {
-        throw new Error(`Ошибка сервера: ${response.status}`)
+        const data = await response.json()
+        console.log('Departments response:', data)
+
+        const normalizedDepartments = normalizeDepartmentsResponse(data)
+
+        setDepartments(normalizedDepartments)
+      } catch (error) {
+        console.error('Departments loading error:', error)
+        setDepartmentsError('Не удалось загрузить отделы')
+      } finally {
+        setDepartmentsLoading(false)
       }
-
-      const data = await response.json()
-      console.log('Departments response:', data)
-
-      const normalizedDepartments = normalizeDepartmentsResponse(data)
-
-      setDepartments(normalizedDepartments)
-    } catch (error) {
-      console.error('Departments loading error:', error)
-      setDepartmentsError('Не удалось загрузить отделы')
-    } finally {
-      setDepartmentsLoading(false)
     }
-  }
 
-  loadDepartments()
-}, [])
+    loadDepartments()
+  }, [])
 
   const openLoginTab = () => {
     setTab('login')
@@ -250,7 +235,7 @@ export default function Auth({ onLogin }) {
     }
   }
 
-  const handleRegisterSubmit = (e) => {
+  const handleRegisterSubmit = async (e) => {
     e.preventDefault()
 
     if (!fullName.trim()) {
@@ -268,15 +253,41 @@ export default function Auth({ onLogin }) {
       return
     }
 
-    console.log('register submit', {
-      fullName,
-      phone,
-      department,
-    })
+    try {
+      const response = await fetch('https://n8n.lpaderina.ru/webhook/entercam-register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fio: fullName.trim(),
+          phone,
+          department,
+        }),
+      })
 
-    alert('Заявка на регистрацию отправлена')
+      if (!response.ok) {
+        throw new Error(`Ошибка сервера: ${response.status}`)
+      }
 
-    setTab('login')
+      const data = await response.json()
+      console.log('Register response:', data)
+
+      if (data.success === false) {
+        alert(data.message || 'Не удалось отправить заявку')
+        return
+      }
+
+      alert('Заявка на регистрацию отправлена')
+
+      setFullName('')
+      setPhone('')
+      setDepartment('')
+      setTab('login')
+    } catch (error) {
+      console.error('Register error:', error)
+      alert('Не удалось отправить заявку. Проверьте подключение или настройки n8n.')
+    }
   }
 
   return (
