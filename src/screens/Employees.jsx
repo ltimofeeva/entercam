@@ -5,7 +5,7 @@ import EmptyState from "../components/EmptyState.jsx";
 import { uid } from "../lib/utils.js";
 
 const ADD_EMPLOYEE_WEBHOOK =
-  "https://n8n.lpaderina.ru/webhook/add_employee";
+  "https://n8n.lpaderina.ru/webhook/add_employee_dop";
 
 const GET_EMPLOYEES_WEBHOOK =
   "https://n8n.lpaderina.ru/webhook/get_employee_list";
