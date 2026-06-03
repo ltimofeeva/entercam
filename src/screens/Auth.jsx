@@ -13,17 +13,14 @@ function formatPhone(value) {
 
   if (!digits) return ''
 
-  // если начали с 8 — заменяем на 7
   if (digits[0] === '8') {
     digits = '7' + digits.slice(1)
   }
 
-  // если начали не с 7 — подставляем 7
   if (digits[0] !== '7') {
     digits = '7' + digits
   }
 
-  // максимум 11 цифр: 7XXXXXXXXXX
   digits = digits.slice(0, 11)
 
   const country = '+7'
@@ -43,7 +40,7 @@ function formatPhone(value) {
   return result
 }
 
-export default function Auth() {
+export default function Auth({ onLogin }) {
   const [tab, setTab] = useState('login')
 
   const [login, setLogin] = useState('')
@@ -72,12 +69,49 @@ export default function Auth() {
 
   const handleLoginSubmit = (e) => {
     e.preventDefault()
-    console.log('login submit', { login, password })
+
+    if (!login.trim() || !password.trim()) {
+      alert('Введите логин и пароль')
+      return
+    }
+
+    const userData = {
+      login: login.trim(),
+      name: login.trim(),
+      fio: login.trim(),
+      department: '',
+    }
+
+    onLogin(userData)
   }
 
   const handleRegisterSubmit = (e) => {
     e.preventDefault()
-    console.log('register submit', { fullName, phone, department })
+
+    if (!fullName.trim()) {
+      alert('Введите ФИО')
+      return
+    }
+
+    if (!phone || phone.length < 18) {
+      alert('Введите номер телефона полностью')
+      return
+    }
+
+    if (!department) {
+      alert('Выберите отдел')
+      return
+    }
+
+    console.log('register submit', {
+      fullName,
+      phone,
+      department,
+    })
+
+    alert('Заявка на регистрацию отправлена')
+
+    setTab('login')
   }
 
   return (
@@ -117,6 +151,7 @@ export default function Auth() {
                 placeholder="Введите логин"
                 value={login}
                 onChange={(e) => setLogin(e.target.value)}
+                autoComplete="username"
               />
             </div>
 
@@ -127,6 +162,7 @@ export default function Auth() {
                 placeholder="Введите пароль"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
               />
             </div>
 
@@ -134,7 +170,11 @@ export default function Auth() {
               Войти
             </button>
 
-            <button type="button" className="auth-link-btn">
+            <button
+              type="button"
+              className="auth-link-btn"
+              onClick={() => alert('Восстановление пароля подключим следующим шагом')}
+            >
               Забыли пароль?
             </button>
           </form>
@@ -147,6 +187,7 @@ export default function Auth() {
                 placeholder="Введите ФИО"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
+                autoComplete="name"
               />
             </div>
 
@@ -160,6 +201,7 @@ export default function Auth() {
                 onFocus={handlePhoneFocus}
                 onChange={handlePhoneChange}
                 onBlur={handlePhoneBlur}
+                autoComplete="tel"
               />
             </div>
 
