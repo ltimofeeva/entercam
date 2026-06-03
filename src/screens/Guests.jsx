@@ -136,8 +136,18 @@ export default function Guests({ state, setState }) {
 
   const guestsArray = normalizeGuests(state?.guests);
 
+  const getUserPayload = () => ({
+    id: state?.currentUser?.id || null,
+    fio: state?.currentUser?.fio || state?.currentUser?.name || "",
+    phone: state?.currentUser?.phone || "",
+    department: state?.currentUser?.department || "",
+    department_id: state?.currentUser?.department_id || "",
+    chat_id: state?.currentUser?.chat_id || "",
+  });
+
   const getChatIdData = () => {
     const ctx = getTgContext();
+
     return {
       chat_id: state?.currentUser?.chat_id || ctx?.user_id || "",
     };
@@ -240,6 +250,7 @@ export default function Guests({ state, setState }) {
     const plate = normPlate(normalizePlateForValidation(form.plate));
     const fio = (form.fio || "").trim();
     const chatIdData = getChatIdData();
+    const userPayload = getUserPayload();
 
     const payload = {
       fio,
@@ -275,6 +286,7 @@ export default function Guests({ state, setState }) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            user: userPayload,
             guest: buildGuestPayload(updatedGuest),
           }),
         });
@@ -326,6 +338,7 @@ export default function Guests({ state, setState }) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            user: userPayload,
             guest: buildGuestPayload(next),
           }),
         });
@@ -358,12 +371,15 @@ export default function Guests({ state, setState }) {
     try {
       setSaving(true);
 
+      const userPayload = getUserPayload();
+
       const res = await fetch("https://n8n.lpaderina.ru/webhook/guest_delete", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          user: userPayload,
           guest: buildGuestPayload({
             id: guest.id,
             fio: guest.fio || guest.name || "",
@@ -373,7 +389,11 @@ export default function Guests({ state, setState }) {
             exitDate: guest.exitDate || "",
             exitTime: guest.exitTime || "",
             type: guest.type || "car_number",
-            chat_id: guest.chat_id || state?.currentUser?.chat_id || getTgContext()?.user_id || "",
+            chat_id:
+              guest.chat_id ||
+              state?.currentUser?.chat_id ||
+              getTgContext()?.user_id ||
+              "",
           }),
         }),
       });
@@ -404,6 +424,7 @@ export default function Guests({ state, setState }) {
 
       const currentDate = getTodayDate();
       const currentTime = getCurrentTime();
+      const userPayload = getUserPayload();
 
       const preparedGuest = {
         id: guest.id,
@@ -414,7 +435,11 @@ export default function Guests({ state, setState }) {
         exitDate: currentDate,
         exitTime: currentTime,
         type: guest.type || "car_number",
-        chat_id: guest.chat_id || state?.currentUser?.chat_id || getTgContext()?.user_id || "",
+        chat_id:
+          guest.chat_id ||
+          state?.currentUser?.chat_id ||
+          getTgContext()?.user_id ||
+          "",
       };
 
       const res = await fetch("https://n8n.lpaderina.ru/webhook/guest_allow", {
@@ -423,6 +448,7 @@ export default function Guests({ state, setState }) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          user: userPayload,
           guest: buildGuestPayload(preparedGuest),
         }),
       });
