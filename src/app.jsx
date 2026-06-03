@@ -8,6 +8,12 @@ import { initTg, haptic, showAlert } from "./lib/tg.js";
 import { loadState, saveState } from "./lib/storage.js";
 import { normPlate } from "./lib/utils.js";
 import { api } from "./lib/api.js";
+import Auth from './screens/Auth'
+import './styles.css'
+
+export default function App() {
+  return <Auth />
+}
 
 function normalizeGuestResponse(raw) {
   if (!raw) return [];
