@@ -85,9 +85,6 @@ export default function Auth({ onLogin }) {
 
       const response = await fetch('https://n8n.lpaderina.ru/webhook-test/entercam-departments', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           source: 'entercam_app',
         }),
