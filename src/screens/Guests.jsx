@@ -185,12 +185,15 @@ export default function Guests({ state, setState }) {
   };
 
   const openEditModal = (guest) => {
+    const entryDate = guest.entryDate || getTodayDate();
+    const exitDate = guest.exitDate || entryDate;
+
     setForm({
       fio: guest.fio || guest.name || "",
       plate: guest.plate || "",
-      entryDate: guest.entryDate || getTodayDate(),
+      entryDate,
       entryTime: guest.entryTime || "00:00",
-      exitDate: guest.exitDate || getTodayDate(),
+      exitDate: exitDate < entryDate ? entryDate : exitDate,
       exitTime: guest.exitTime || "23:59",
     });
 
@@ -231,6 +234,14 @@ export default function Guests({ state, setState }) {
 
     if (!(form.exitDate || "").trim()) {
       nextErrors.exitDate = "Заполните поле «Дата выезда»";
+    }
+
+    if (
+      (form.entryDate || "").trim() &&
+      (form.exitDate || "").trim() &&
+      form.exitDate < form.entryDate
+    ) {
+      nextErrors.exitDate = "Дата выезда не может быть раньше даты въезда";
     }
 
     setErrors(nextErrors);
@@ -664,13 +675,22 @@ export default function Guests({ state, setState }) {
                   value={form.entryDate}
                   onChange={(e) => {
                     const newEntryDate = e.target.value;
-                    setForm({
-                      ...form,
+
+                    setForm((prev) => ({
+                      ...prev,
                       entryDate: newEntryDate,
-                      exitDate: form.exitDate || newEntryDate,
-                    });
+                      exitDate:
+                        !prev.exitDate || prev.exitDate < newEntryDate
+                          ? newEntryDate
+                          : prev.exitDate,
+                    }));
+
                     if (errors.entryDate) {
                       setErrors((prev) => ({ ...prev, entryDate: "" }));
+                    }
+
+                    if (errors.exitDate) {
+                      setErrors((prev) => ({ ...prev, exitDate: "" }));
                     }
                   }}
                 />
@@ -687,8 +707,18 @@ export default function Guests({ state, setState }) {
                   className="input"
                   type="date"
                   value={form.exitDate}
+                  min={form.entryDate}
                   onChange={(e) => {
-                    setForm({ ...form, exitDate: e.target.value });
+                    const newExitDate = e.target.value;
+
+                    setForm((prev) => ({
+                      ...prev,
+                      exitDate:
+                        newExitDate < prev.entryDate
+                          ? prev.entryDate
+                          : newExitDate,
+                    }));
+
                     if (errors.exitDate) {
                       setErrors((prev) => ({ ...prev, exitDate: "" }));
                     }
