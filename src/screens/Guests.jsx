@@ -64,20 +64,61 @@ function createEmptyForm() {
   };
 }
 
-function isGuestActiveByTime(guest) {
-  const timeTo = guest?.time_to || guest?.exitTime || "";
+// Парсит дату выезда в форматах "YYYY-MM-DD" или "DD.MM.YYYY"
+function parseExitDate(dateStr) {
+  if (!dateStr) return null;
 
-  if (!timeTo) return true;
+  const s = String(dateStr).trim();
 
-  const [hours, minutes] = timeTo.split(":").map(Number);
+  if (s.includes("-")) {
+    const [y, m, d] = s.split("-").map(Number);
+    if (y && m && d) return { y, m, d };
+  }
 
-  if (Number.isNaN(hours) || Number.isNaN(minutes)) return true;
+  if (s.includes(".")) {
+    const [d, m, y] = s.split(".").map(Number);
+    if (y && m && d) return { y, m, d };
+  }
 
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  const guestMinutes = hours * 60 + minutes;
+  return null;
+}
 
-  return guestMinutes > currentMinutes;
+function isGuestActive(guest) {
+  const exitDateRaw =
+    guest?.exitDate || guest?.date_to || guest?.exit_date || "";
+  const exitTimeRaw =
+    guest?.exitTime || guest?.time_to || guest?.exit_time || "23:59";
+
+  const parsedDate = parseExitDate(exitDateRaw);
+
+  // Нет корректной даты выезда — считаем гостя активным (бессрочный пропуск)
+  if (!parsedDate) return true;
+
+  let hours = 23;
+  let minutes = 59;
+
+  const timeParts = String(exitTimeRaw).split(":");
+  if (timeParts.length >= 2) {
+    const hh = Number(timeParts[0]);
+    const mm = Number(timeParts[1]);
+    if (!Number.isNaN(hh) && !Number.isNaN(mm)) {
+      hours = hh;
+      minutes = mm;
+    }
+  }
+
+  const exitMoment = new Date(
+    parsedDate.y,
+    parsedDate.m - 1,
+    parsedDate.d,
+    hours,
+    minutes,
+    0,
+    0
+  );
+
+  // Активен, пока момент выезда ещё не наступил
+  return exitMoment.getTime() > Date.now();
 }
 
 function normalizePlateForValidation(value) {
@@ -165,7 +206,7 @@ export default function Guests({ state, setState }) {
     }
 
     filtered = filtered.filter((g) => {
-      const isActive = isGuestActiveByTime(g);
+      const isActive = isGuestActive(g);
       return activeTab === "active" ? isActive : !isActive;
     });
 
