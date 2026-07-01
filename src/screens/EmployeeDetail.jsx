@@ -4,7 +4,6 @@ import Input from "../components/Input.jsx";
 import Modal from "../components/Modal.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import { normPlate, uid } from "../lib/utils.js";
-import { getTgContext } from "../lib/tg.js";
 
 const DELETE_EMPLOYEE_WEBHOOK =
   "https://n8n.lpaderina.ru/webhook/delete_employee";
@@ -183,13 +182,10 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
       try {
         setCarsLoading(true);
 
-        const ctx = getTgContext();
-        const userId = ctx?.user_id ?? null;
-
         const payload = {
           event: "get_employee_cars",
           ts: new Date().toISOString(),
-          user_id: userId,
+          user_id: null,
           current_user: state.currentUser ?? null,
           employee: {
             id: emp.id,
@@ -289,9 +285,6 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
       return;
     }
 
-    const ctx = getTgContext();
-    const userId = ctx?.user_id ?? null;
-
     const newCar = {
       id: uid(),
       plate: p,
@@ -300,7 +293,7 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
     const payload = {
       event: "add_employee_car",
       ts: new Date().toISOString(),
-      user_id: userId,
+      user_id: null,
       current_user: state.currentUser ?? null,
       employee: {
         id: emp.id,
@@ -366,13 +359,10 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
       return;
     }
 
-    const ctx = getTgContext();
-    const userId = ctx?.user_id ?? null;
-
     const payload = {
       event: "change_employee",
       ts: new Date().toISOString(),
-      user_id: userId,
+      user_id: null,
       current_user: state.currentUser ?? null,
       employee_before: {
         id: emp.id,
@@ -432,13 +422,10 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
     const car = (emp.cars || []).find((c) => c.id === carId);
     if (!car) return;
 
-    const ctx = getTgContext();
-    const userId = ctx?.user_id ?? null;
-
     const payload = {
       event: "delete_employee_car",
       ts: new Date().toISOString(),
-      user_id: userId,
+      user_id: null,
       current_user: state.currentUser ?? null,
       employee: {
         id: emp.id,
@@ -489,13 +476,10 @@ export default function EmployeeDetail({ state, setState, employeeId, onBack }) 
   const deleteEmployee = async () => {
     if (deletingEmployee) return;
 
-    const ctx = getTgContext();
-    const userId = ctx?.user_id ?? null;
-
     const payload = {
       event: "delete_employee",
       ts: new Date().toISOString(),
-      user_id: userId,
+      user_id: null,
       current_user: state.currentUser ?? null,
       employee: {
         id: emp.id,

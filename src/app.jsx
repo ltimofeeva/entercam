@@ -5,7 +5,6 @@ import Employees from "./screens/Employees.jsx";
 import EmployeeDetail from "./screens/EmployeeDetail.jsx";
 import Guests from "./screens/Guests.jsx";
 import Auth from "./screens/Auth.jsx";
-import { initTg, haptic } from "./lib/tg.js";
 import { loadState, saveState } from "./lib/storage.js";
 import { normPlate } from "./lib/utils.js";
 import { api } from "./lib/api.js";
@@ -118,8 +117,6 @@ export default function App() {
   const [guestsLoading, setGuestsLoading] = useState(false);
 
   useEffect(() => {
-    initTg();
-
     const savedAuth = localStorage.getItem("entercam_auth");
     const savedUser = localStorage.getItem("entercam_user");
 
@@ -271,18 +268,14 @@ export default function App() {
     const plate = normPlate(plateRaw);
 
     try {
-      haptic("impact", "medium");
-
       const res = await api.allowExitByPlate(plate);
 
       if (!res.ok) {
         throw new Error("API error");
       }
 
-      haptic("notify", "success");
       safeAlert(`Выезд разрешён: ${plate}`);
     } catch (e) {
-      haptic("notify", "error");
       safeAlert(`Не удалось разрешить выезд: ${plate}`);
     }
   }
