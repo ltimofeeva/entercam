@@ -4,7 +4,6 @@ import Input from "../components/Input.jsx";
 import Modal from "../components/Modal.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import { normPlate, uid } from "../lib/utils.js";
-import { getTgContext } from "../lib/tg.js";
 
 function normalizeGuests(input) {
   if (!input) return [];
@@ -186,13 +185,9 @@ export default function Guests({ state, setState }) {
     chat_id: state?.currentUser?.chat_id || "",
   });
 
-  const getChatIdData = () => {
-    const ctx = getTgContext();
-
-    return {
-      chat_id: state?.currentUser?.chat_id || ctx?.user_id || "",
-    };
-  };
+  const getChatIdData = () => ({
+    chat_id: state?.currentUser?.chat_id || "",
+  });
 
   const list = useMemo(() => {
     const qq = normPlate(q);
@@ -441,11 +436,7 @@ export default function Guests({ state, setState }) {
             exitDate: guest.exitDate || "",
             exitTime: guest.exitTime || "",
             type: guest.type || "car_number",
-            chat_id:
-              guest.chat_id ||
-              state?.currentUser?.chat_id ||
-              getTgContext()?.user_id ||
-              "",
+            chat_id: guest.chat_id || state?.currentUser?.chat_id || "",
           }),
         }),
       });
@@ -487,11 +478,7 @@ export default function Guests({ state, setState }) {
         exitDate: currentDate,
         exitTime: currentTime,
         type: guest.type || "car_number",
-        chat_id:
-          guest.chat_id ||
-          state?.currentUser?.chat_id ||
-          getTgContext()?.user_id ||
-          "",
+        chat_id: guest.chat_id || state?.currentUser?.chat_id || "",
       };
 
       const res = await fetch("https://n8n.lpaderina.ru/webhook/guest_allow", {

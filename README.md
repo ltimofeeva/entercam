@@ -1,9 +1,9 @@
-# Telegram Mini App — Car Access
+# EnterCam — Car Access
 
-Mini App для управления:
+Веб-приложение (PWA) для управления:
 - Сотрудники: добавить/получить/удалить, машины сотрудника (добавить/удалить)
 - Гости: добавить гостевую машину + даты, разрешить выезд
-- Шлагбаум: лента “у ворот”, разрешить выезд
+- Шлагбаум: лента "у ворот", разрешить выезд
 
 ## Запуск локально
 ```bash
@@ -25,11 +25,6 @@ npm run preview
 - Build Command: `npm run build`
 - Output Directory: `dist`
 - Install Command: `npm i`
-
-## Подключение к Telegram
-1) Создай бота через BotFather
-2) В BotFather настрой Mini App (Web App URL) на домен Vercel
-3) Открой миниапп через кнопку / menu / deep link
 
 ## Интеграция API (n8n / Entercam)
 Смотри `src/lib/api.js` — туда подставляются реальные `fetch()` запросы.
