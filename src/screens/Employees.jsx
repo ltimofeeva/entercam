@@ -290,7 +290,7 @@ export default function Employees({ state, setState, goEmployee }) {
       setOpen(false);
     } catch (e) {
       console.error("addEmployee error:", e);
-      alert("Не удалось сохранить сотрудника. Проверьте вебхук или сеть.");
+      alert("Не удалось сохранить сотрудника. Такой номер телефона уже присвоен другому сотруднику.");
     } finally {
       setSaving(false);
     }
