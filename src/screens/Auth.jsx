@@ -100,11 +100,14 @@ export default function Auth({ onLogin }) {
   const [tab, setTab] = useState('login')
 
   const [loginPhone, setLoginPhone] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
   const [loginLoading, setLoginLoading] = useState(false)
 
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [department, setDepartment] = useState('')
+  const [password, setPassword] = useState('')
+  const [passwordConfirm, setPasswordConfirm] = useState('')
   const [registerLoading, setRegisterLoading] = useState(false)
 
   const [departments, setDepartments] = useState([])
@@ -199,6 +202,11 @@ export default function Auth({ onLogin }) {
       return
     }
 
+    if (!loginPassword) {
+      alert('Введите пароль')
+      return
+    }
+
     try {
       setLoginLoading(true)
 
@@ -209,6 +217,7 @@ export default function Auth({ onLogin }) {
         },
         body: JSON.stringify({
           phone: loginPhone,
+          password: loginPassword,
         }),
       })
 
@@ -220,14 +229,14 @@ export default function Auth({ onLogin }) {
       console.log('Login response:', data)
 
       if (data.success === false || data.authorized === false) {
-        alert(data.message || 'Пользователь не найден. Пройдите регистрацию.')
+        alert(data.message || 'Неверный номер телефона или пароль.')
         return
       }
 
       const userData = normalizeLoginResponse(data, loginPhone)
 
       if (!userData) {
-        alert('Пользователь не найден. Пройдите регистрацию.')
+        alert('Неверный номер телефона или пароль.')
         return
       }
 
@@ -258,6 +267,16 @@ export default function Auth({ onLogin }) {
       return
     }
 
+    if (!password || password.length < 6) {
+      alert('Пароль должен содержать не менее 6 символов')
+      return
+    }
+
+    if (password !== passwordConfirm) {
+      alert('Пароли не совпадают')
+      return
+    }
+
     try {
       setRegisterLoading(true)
 
@@ -270,6 +289,7 @@ export default function Auth({ onLogin }) {
           fio: fullName.trim(),
           phone,
           department,
+          password,
         }),
       })
 
@@ -290,6 +310,8 @@ export default function Auth({ onLogin }) {
       setFullName('')
       setPhone('')
       setDepartment('')
+      setPassword('')
+      setPasswordConfirm('')
       setTab('login')
     } catch (error) {
       console.error('Register error:', error)
@@ -340,6 +362,17 @@ export default function Auth({ onLogin }) {
                 onChange={handleLoginPhoneChange}
                 onBlur={handleLoginPhoneBlur}
                 autoComplete="tel"
+              />
+            </div>
+
+            <div className="auth-field">
+              <label>Пароль</label>
+              <input
+                type="password"
+                placeholder="Введите пароль"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                autoComplete="current-password"
               />
             </div>
 
@@ -399,6 +432,28 @@ export default function Auth({ onLogin }) {
               {departmentsError ? (
                 <p className="auth-error">{departmentsError}</p>
               ) : null}
+            </div>
+
+            <div className="auth-field">
+              <label>Пароль</label>
+              <input
+                type="password"
+                placeholder="Не менее 6 символов"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+            </div>
+
+            <div className="auth-field">
+              <label>Повторите пароль</label>
+              <input
+                type="password"
+                placeholder="Повторите пароль"
+                value={passwordConfirm}
+                onChange={(e) => setPasswordConfirm(e.target.value)}
+                autoComplete="new-password"
+              />
             </div>
 
             <button
