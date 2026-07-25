@@ -236,7 +236,7 @@ export default function Auth({ onLogin }) {
     try {
       setLoginLoading(true)
 
-      const response = await fetch('https://n8n.lpaderina.ru/webhook/employee', {
+      const response = await fetch('https://n8n.lpaderina.ru/webhook/log_in', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
