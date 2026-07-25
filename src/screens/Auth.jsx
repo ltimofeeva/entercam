@@ -84,6 +84,28 @@ function normalizeLoginResponse(data, phone) {
   }
 }
 
+// Превращает ответ вебхука об отказе в текст ошибки для пользователя.
+// Поддерживает разные варианты полей, которые может вернуть n8n:
+// { error: "user_not_found" } / { code: "wrong_password" } / { reason: ... } / { message: "..." }
+function loginErrorMessage(data) {
+  const code = String(data?.error || data?.code || data?.reason || '')
+    .toLowerCase()
+
+  if (code.includes('not_found') || code.includes('no_user')) {
+    return 'Пользователь с таким номером не найден. Пройдите регистрацию.'
+  }
+
+  if (code.includes('password')) {
+    return 'Неверный пароль.'
+  }
+
+  if (data?.message) {
+    return data.message
+  }
+
+  return 'Неверный номер телефона или пароль.'
+}
+
 function normalizeDepartmentsResponse(data) {
   if (!data) {
     return []
@@ -101,6 +123,7 @@ export default function Auth({ onLogin }) {
 
   const [loginPhone, setLoginPhone] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
+  const [loginError, setLoginError] = useState('')
   const [loginLoading, setLoginLoading] = useState(false)
 
   const [fullName, setFullName] = useState('')
@@ -169,6 +192,7 @@ export default function Auth({ onLogin }) {
   const handleLoginPhoneChange = (e) => {
     const formatted = formatPhone(e.target.value)
     setLoginPhone(formatted)
+    if (loginError) setLoginError('')
   }
 
   const handleLoginPhoneBlur = () => {
@@ -197,13 +221,15 @@ export default function Auth({ onLogin }) {
   const handleLoginSubmit = async (e) => {
     e.preventDefault()
 
+    setLoginError('')
+
     if (!loginPhone || loginPhone.length < 18) {
-      alert('Введите номер телефона полностью')
+      setLoginError('Введите номер телефона полностью')
       return
     }
 
     if (!loginPassword) {
-      alert('Введите пароль')
+      setLoginError('Введите пароль')
       return
     }
 
@@ -229,21 +255,21 @@ export default function Auth({ onLogin }) {
       console.log('Login response:', data)
 
       if (data.success === false || data.authorized === false) {
-        alert(data.message || 'Неверный номер телефона или пароль.')
+        setLoginError(loginErrorMessage(data))
         return
       }
 
       const userData = normalizeLoginResponse(data, loginPhone)
 
       if (!userData) {
-        alert('Неверный номер телефона или пароль.')
+        setLoginError('Неверный номер телефона или пароль.')
         return
       }
 
       onLogin(userData)
     } catch (error) {
       console.error('Login error:', error)
-      alert('Не удалось выполнить вход. Проверьте подключение или настройки n8n.')
+      setLoginError('Не удалось выполнить вход. Проверьте подключение к интернету.')
     } finally {
       setLoginLoading(false)
     }
@@ -371,10 +397,17 @@ export default function Auth({ onLogin }) {
                 type="password"
                 placeholder="Введите пароль"
                 value={loginPassword}
-                onChange={(e) => setLoginPassword(e.target.value)}
+                onChange={(e) => {
+                  setLoginPassword(e.target.value)
+                  if (loginError) setLoginError('')
+                }}
                 autoComplete="current-password"
               />
             </div>
+
+            {loginError ? (
+              <p className="auth-error">{loginError}</p>
+            ) : null}
 
             <button
               type="submit"
