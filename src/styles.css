@@ -417,6 +417,13 @@ input[type="time"] {
   color: #8b95a7;
 }
 
+.auth-error {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #dc2626;
+}
+
 .auth-field input:focus,
 .auth-field select:focus {
   border-color: #377df6;
