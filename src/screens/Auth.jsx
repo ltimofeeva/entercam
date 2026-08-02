@@ -106,6 +106,22 @@ function loginErrorMessage(data) {
   return 'Неверный номер телефона или пароль.'
 }
 
+// Ответ вебхука change_password: отдельно ловим случай, когда номера нет в базе.
+function resetErrorMessage(data) {
+  const code = String(data?.error || data?.code || data?.reason || '')
+    .toLowerCase()
+
+  if (code.includes('not_found') || code.includes('no_user')) {
+    return 'Пользователь не зарегистрирован, перейдите на форму регистрации или проверьте номер телефона'
+  }
+
+  if (data?.message) {
+    return data.message
+  }
+
+  return 'Пользователь не зарегистрирован, перейдите на форму регистрации или проверьте номер телефона'
+}
+
 function normalizeDepartmentsResponse(data) {
   if (!data) {
     return []
@@ -132,6 +148,13 @@ export default function Auth({ onLogin }) {
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [registerLoading, setRegisterLoading] = useState(false)
+
+  const [resetPhone, setResetPhone] = useState('')
+  const [resetPassword, setResetPassword] = useState('')
+  const [resetPasswordConfirm, setResetPasswordConfirm] = useState('')
+  const [resetError, setResetError] = useState('')
+  const [resetSuccess, setResetSuccess] = useState('')
+  const [resetLoading, setResetLoading] = useState(false)
 
   const [departments, setDepartments] = useState([])
   const [departmentsLoading, setDepartmentsLoading] = useState(false)
@@ -181,6 +204,29 @@ export default function Auth({ onLogin }) {
 
   const openRegisterTab = () => {
     setTab('register')
+  }
+
+  const openResetTab = () => {
+    setResetError('')
+    setResetSuccess('')
+    setTab('reset')
+  }
+
+  const handleResetPhoneFocus = () => {
+    if (!resetPhone) {
+      setResetPhone('+7')
+    }
+  }
+
+  const handleResetPhoneChange = (e) => {
+    setResetPhone(formatPhone(e.target.value))
+    if (resetError) setResetError('')
+  }
+
+  const handleResetPhoneBlur = () => {
+    if (resetPhone === '+7') {
+      setResetPhone('')
+    }
   }
 
   const handleLoginPhoneFocus = () => {
@@ -347,16 +393,80 @@ export default function Auth({ onLogin }) {
     }
   }
 
+  const handleResetSubmit = async (e) => {
+    e.preventDefault()
+
+    setResetError('')
+    setResetSuccess('')
+
+    if (!resetPhone || resetPhone.length < 18) {
+      setResetError('Введите номер телефона полностью')
+      return
+    }
+
+    if (!resetPassword || resetPassword.length < 6) {
+      setResetError('Пароль должен содержать не менее 6 символов')
+      return
+    }
+
+    if (resetPassword !== resetPasswordConfirm) {
+      setResetError('Пароли не совпадают')
+      return
+    }
+
+    try {
+      setResetLoading(true)
+
+      const response = await fetch('https://n8n.lpaderina.ru/webhook/change_password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone: resetPhone,
+          password: resetPassword,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Ошибка сервера: ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log('Change password response:', data)
+
+      if (data.success === false || data.updated === false) {
+        setResetError(resetErrorMessage(data))
+        return
+      }
+
+      setResetPhone('')
+      setResetPassword('')
+      setResetPasswordConfirm('')
+      setResetSuccess('Пароль изменён. Теперь войдите с новым паролем.')
+    } catch (error) {
+      console.error('Change password error:', error)
+      setResetError('Не удалось изменить пароль. Проверьте подключение к интернету.')
+    } finally {
+      setResetLoading(false)
+    }
+  }
+
   return (
     <div className="auth-screen">
       <div className="auth-card">
         <div className="auth-header">
-          <h1 className="auth-title">Добро пожаловать</h1>
+          <h1 className="auth-title">
+            {tab === 'reset' ? 'Задайте новый пароль' : 'Добро пожаловать'}
+          </h1>
           <p className="auth-subtitle">
-            Войдите в приложение или добавьте нового сотрудника
+            {tab === 'reset'
+              ? 'Укажите номер телефона, на который зарегистрирован сотрудник'
+              : 'Войдите в приложение или добавьте нового сотрудника'}
           </p>
         </div>
 
+        {tab === 'reset' ? null : (
         <div className="auth-tabs">
           <button
             type="button"
@@ -374,6 +484,7 @@ export default function Auth({ onLogin }) {
             Регистрация
           </button>
         </div>
+        )}
 
         {tab === 'login' ? (
           <form className="auth-form" onSubmit={handleLoginSubmit}>
@@ -416,8 +527,16 @@ export default function Auth({ onLogin }) {
             >
               {loginLoading ? 'Входим...' : 'Войти'}
             </button>
+
+            <button
+              type="button"
+              className="auth-link-btn"
+              onClick={openResetTab}
+            >
+              Забыли пароль?
+            </button>
           </form>
-        ) : (
+        ) : tab === 'register' ? (
           <form className="auth-form" onSubmit={handleRegisterSubmit}>
             <div className="auth-field">
               <label>ФИО</label>
@@ -495,6 +614,77 @@ export default function Auth({ onLogin }) {
               disabled={registerLoading}
             >
               {registerLoading ? 'Идет регистрация...' : 'Зарегистрироваться'}
+            </button>
+
+            <button
+              type="button"
+              className="auth-link-btn"
+              onClick={openResetTab}
+            >
+              Забыли пароль?
+            </button>
+          </form>
+        ) : (
+          <form className="auth-form" onSubmit={handleResetSubmit}>
+            <div className="auth-field">
+              <label>Номер телефона</label>
+              <input
+                type="tel"
+                inputMode="numeric"
+                placeholder="+7 (___) ___-__-__"
+                value={resetPhone}
+                onFocus={handleResetPhoneFocus}
+                onChange={handleResetPhoneChange}
+                onBlur={handleResetPhoneBlur}
+                autoComplete="tel"
+              />
+            </div>
+
+            <div className="auth-field">
+              <label>Новый пароль</label>
+              <input
+                type="password"
+                placeholder="Не менее 6 символов"
+                value={resetPassword}
+                onChange={(e) => {
+                  setResetPassword(e.target.value)
+                  if (resetError) setResetError('')
+                }}
+                autoComplete="new-password"
+              />
+            </div>
+
+            <div className="auth-field">
+              <label>Повторите пароль</label>
+              <input
+                type="password"
+                placeholder="Повторите новый пароль"
+                value={resetPasswordConfirm}
+                onChange={(e) => {
+                  setResetPasswordConfirm(e.target.value)
+                  if (resetError) setResetError('')
+                }}
+                autoComplete="new-password"
+              />
+            </div>
+
+            {resetError ? <p className="auth-error">{resetError}</p> : null}
+            {resetSuccess ? <p className="auth-success">{resetSuccess}</p> : null}
+
+            <button
+              type="submit"
+              className="auth-primary-btn"
+              disabled={resetLoading}
+            >
+              {resetLoading ? 'Сохраняем...' : 'Сохранить новый пароль'}
+            </button>
+
+            <button
+              type="button"
+              className="auth-link-btn"
+              onClick={openLoginTab}
+            >
+              Вернуться ко входу
             </button>
           </form>
         )}
