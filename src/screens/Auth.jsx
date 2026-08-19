@@ -189,7 +189,7 @@ export default function Auth({ onLogin }) {
         setDepartments(normalizedDepartments)
       } catch (error) {
         console.error('Departments loading error:', error)
-        setDepartmentsError('Не удалось загрузить отделы')
+        setDepartmentsError('Не удалось загрузить список арендаторов')
       } finally {
         setDepartmentsLoading(false)
       }
@@ -335,7 +335,7 @@ export default function Auth({ onLogin }) {
     }
 
     if (!department) {
-      alert('Выберите отдел')
+      alert('Выберите номер арендатора')
       return
     }
 
@@ -564,14 +564,16 @@ export default function Auth({ onLogin }) {
             </div>
 
             <div className="auth-field">
-              <label>Отдел</label>
+              <label>Номер арендатора</label>
               <select
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
                 disabled={departmentsLoading}
               >
                 <option value="">
-                  {departmentsLoading ? 'Загрузка отделов...' : 'Выберите отдел'}
+                  {departmentsLoading
+                    ? 'Загрузка списка...'
+                    : 'Выберите номер из списка'}
                 </option>
 
                 {departments.map((item) => (
